@@ -22,6 +22,7 @@
 #include <linux/gpio.h>
 #include <linux/davinci_emac.h>
 #include <linux/i2c/pca953x.h>
+#include <linux/regulator/machine.h>
 #include <linux/i2c/tsc2004.h>
 
 #include <mach/hardware.h>
@@ -153,6 +154,122 @@ void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
 	return ;
  }
 
+/* TPS65023 specific initialization */
+/* VDCDC1 -> VDD_CORE */
+static struct regulator_consumer_supply am3517_evm_vdcdc1_supplies[] = {
+	{
+		.supply = "vdd_core",
+	},
+};
+
+/* VDCDC2 -> VDDSHV */
+static struct regulator_consumer_supply am3517_evm_vdcdc2_supplies[] = {
+	{
+		.supply = "vddshv",
+	},
+};
+
+/* VDCDC2 |-> VDDS
+	   |-> VDDS_SRAM_CORE_BG
+	   |-> VDDS_SRAM_MPU */
+static struct regulator_consumer_supply am3517_evm_vdcdc3_supplies[] = {
+	{
+		.supply = "vdds",
+	},
+	{
+		.supply = "vdds_sram_core_bg",
+	},
+	{
+		.supply = "vdds_sram_mpu",
+	},
+};
+
+/* LDO1 |-> VDDA1P8V_USBPHY
+	 |-> VDDA_DAC */
+static struct regulator_consumer_supply am3517_evm_ldo1_supplies[] = {
+	{
+		.supply = "vdda1p8v_usbphy",
+	},
+	{
+		.supply = "vdda_dac",
+	},
+};
+
+/* LDO2 -> VDDA3P3V_USBPHY */
+static struct regulator_consumer_supply am3517_evm_ldo2_supplies[] = {
+	{
+		.supply = "vdda3p3v_usbphy",
+	},
+};
+
+static struct regulator_init_data am3517_evm_regulator_data[] = {
+	/* DCDC1 */
+	{
+		.constraints = {
+			.min_uV = 1200000,
+			.max_uV = 1200000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+			.always_on = true,
+			.apply_uV = false,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc1_supplies),
+		.consumer_supplies = am3517_evm_vdcdc1_supplies,
+	},
+	/* DCDC2 */
+	{
+		.constraints = {
+			.min_uV = 3300000,
+			.max_uV = 3300000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+			.always_on = true,
+			.apply_uV = false,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc2_supplies),
+		.consumer_supplies = am3517_evm_vdcdc2_supplies,
+	},
+	/* DCDC3 */
+	{
+		.constraints = {
+			.min_uV = 1800000,
+			.max_uV = 1800000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+			.always_on = true,
+			.apply_uV = false,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc3_supplies),
+		.consumer_supplies = am3517_evm_vdcdc3_supplies,
+	},
+	/* LDO1 */
+	{
+		.constraints = {
+			.min_uV = 1800000,
+			.max_uV = 1800000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+			.always_on = false,
+			.apply_uV = false,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_ldo1_supplies),
+		.consumer_supplies = am3517_evm_ldo1_supplies,
+	},
+	/* LDO2 */
+	{
+		.constraints = {
+			.min_uV = 3300000,
+			.max_uV = 3300000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+			.always_on = false,
+			.apply_uV = false,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_ldo2_supplies),
+		.consumer_supplies = am3517_evm_ldo2_supplies,
+	},
+};
+
 /*
  * TSC 2004 Support
  */
@@ -208,6 +325,11 @@ static struct i2c_board_info __initdata am3517evm_i2c1_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("s35390a", 0x30),
 		.type		= "s35390a",
+	},
+	{
+		I2C_BOARD_INFO("tps65023", 0x48),
+		.flags = I2C_CLIENT_WAKE,
+		.platform_data = &am3517_evm_regulator_data[0],
 	},
 };
 

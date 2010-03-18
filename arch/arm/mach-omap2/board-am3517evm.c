@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
+#include <linux/davinci_emac.h>
 #include <linux/i2c/pca953x.h>
 
 #include <mach/hardware.h>
@@ -30,6 +31,7 @@
 
 #include <plat/board.h>
 #include <plat/common.h>
+#include <plat/control.h>
 #include <plat/usb.h>
 #include <plat/display.h>
 
@@ -38,6 +40,117 @@
 #define LCD_PANEL_PWR		176
 #define LCD_PANEL_BKLIGHT_PWR	182
 #define LCD_PANEL_PWM		181
+
+#define AM35XX_EVM_PHY_MASK          (0xF)
+#define AM35XX_EVM_MDIO_FREQUENCY    (1000000) /*PHY bus frequency */
+
+static struct emac_platform_data am3517_evm_emac_pdata = {
+	.phy_mask       = AM35XX_EVM_PHY_MASK,
+	.mdio_max_freq  = AM35XX_EVM_MDIO_FREQUENCY,
+	.rmii_en        = 1,
+};
+
+static int __init eth_addr_setup(char *str)
+{
+	int i;
+	long res;
+
+	if (str == NULL)
+		return 0;
+	for (i = 0; i <  ETH_ALEN; i++) {
+		if (!strict_strtol(&str[i * 3], 16, &res))
+			am3517_evm_emac_pdata.mac_addr[i] = res;
+		else
+			return -EINVAL;
+	}
+	return 1;
+}
+
+/* Get MAC address from kernel boot parameter eth=AA:BB:CC:DD:EE:FF */
+__setup("eth=", eth_addr_setup);
+
+static struct resource am3517_emac_resources[] = {
+	{
+		.start  = AM35XX_IPSS_EMAC_BASE,
+		.end    = AM35XX_IPSS_EMAC_BASE + 0x3FFFF,
+		.flags  = IORESOURCE_MEM,
+	},
+	{
+		.start  = INT_35XX_EMAC_C0_RXTHRESH_IRQ,
+		.end    = INT_35XX_EMAC_C0_RXTHRESH_IRQ,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.start  = INT_35XX_EMAC_C0_RX_PULSE_IRQ,
+		.end    = INT_35XX_EMAC_C0_RX_PULSE_IRQ,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.start  = INT_35XX_EMAC_C0_TX_PULSE_IRQ,
+		.end    = INT_35XX_EMAC_C0_TX_PULSE_IRQ,
+		.flags  = IORESOURCE_IRQ,
+	},
+	{
+		.start  = INT_35XX_EMAC_C0_MISC_PULSE_IRQ,
+		.end    = INT_35XX_EMAC_C0_MISC_PULSE_IRQ,
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device am3517_emac_device = {
+	.name           = "davinci_emac",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(am3517_emac_resources),
+	.resource       = am3517_emac_resources,
+};
+
+static void am3517_enable_ethernet_int(void)
+{
+	u32 regval;
+
+	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
+	regval = (regval | AM35XX_CPGMAC_C0_RX_PULSE_CLR |
+			AM35XX_CPGMAC_C0_TX_PULSE_CLR |
+			AM35XX_CPGMAC_C0_MISC_PULSE_CLR |
+			AM35XX_CPGMAC_C0_RX_THRESH_CLR);
+	omap_ctrl_writel(regval, AM35XX_CONTROL_LVL_INTR_CLEAR);
+	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
+}
+
+static void am3517_disable_ethernet_int(void)
+{
+	u32 regval;
+
+	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
+	regval = (regval | AM35XX_CPGMAC_C0_RX_PULSE_CLR |
+			AM35XX_CPGMAC_C0_TX_PULSE_CLR);
+	omap_ctrl_writel(regval, AM35XX_CONTROL_LVL_INTR_CLEAR);
+	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
+}
+
+void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
+{
+	u32 regval;
+
+	pdata->ctrl_reg_offset          = AM35XX_EMAC_CNTRL_OFFSET;
+	pdata->ctrl_mod_reg_offset      = AM35XX_EMAC_CNTRL_MOD_OFFSET;
+	pdata->ctrl_ram_offset          = AM35XX_EMAC_CNTRL_RAM_OFFSET;
+	pdata->mdio_reg_offset          = AM35XX_EMAC_MDIO_OFFSET;
+	pdata->ctrl_ram_size            = AM35XX_EMAC_CNTRL_RAM_SIZE;
+	pdata->version                  = EMAC_VERSION_2;
+	pdata->hw_ram_addr              = AM35XX_EMAC_HW_RAM_ADDR;
+	pdata->interrupt_enable	        = am3517_enable_ethernet_int;
+	pdata->interrupt_disable        = am3517_disable_ethernet_int;
+	am3517_emac_device.dev.platform_data     = pdata;
+	platform_device_register(&am3517_emac_device);
+
+	regval = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+	regval = regval & (~(AM35XX_CPGMACSS_SW_RST));
+	omap_ctrl_writel(regval, AM35XX_CONTROL_IP_SW_RESET);
+	regval = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+
+	return ;
+ }
 
 static struct i2c_board_info __initdata am3517evm_i2c_boardinfo[] = {
 	{
@@ -308,6 +421,7 @@ static void __init am3517_evm_init(void)
 	/* DSS */
 	am3517_evm_display_init();
 
+	am3517_evm_ethernet_init(&am3517_evm_emac_pdata);
 	/* RTC - S35390A */
 	am3517_evm_rtc_init();
 

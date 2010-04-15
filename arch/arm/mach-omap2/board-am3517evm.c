@@ -27,7 +27,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/nand.h>
-
+#include <linux/mmc/host.h>
 
 #include <mach/hardware.h>
 #include <mach/am35xx.h>
@@ -42,7 +42,9 @@
 #include <plat/display.h>
 #include <plat/nand.h>
 #include <plat/gpmc.h>
+#include <plat/mmc.h>
 
+#include "hsmmc.h"
 #include "mux.h"
 
 #define LCD_PANEL_PWR		176
@@ -493,6 +495,8 @@ static int __init am3517_evm_i2c_init(void)
 static int lcd_enabled;
 static int dvi_enabled;
 
+#if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
+		defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
 static void __init am3517_evm_display_init(void)
 {
 	int r;
@@ -554,6 +558,20 @@ static void am3517_evm_panel_disable_lcd(struct omap_dss_device *dssdev)
 	gpio_set_value(LCD_PANEL_PWR, 0);
 	lcd_enabled = 0;
 }
+#else
+static inline void __init am3517_evm_display_init(void)
+{
+}
+
+static inline int am3517_evm_panel_enable_lcd(struct omap_dss_device *dssdev)
+{
+	return 0;
+}
+
+static inline void am3517_evm_panel_disable_lcd(struct omap_dss_device *dssdev)
+{
+}
+#endif
 
 static struct omap_dss_device am3517_evm_lcd_device = {
 	.type			= OMAP_DISPLAY_TYPE_DPI,
@@ -666,6 +684,30 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
+static struct omap2_hsmmc_info mmc[] = {
+	{
+		.mmc            = 1,
+		.wires          = 4,
+		.gpio_cd        = 127,
+		.gpio_wp        = 126,
+		.ocr_mask       = MMC_VDD_165_195 |
+				MMC_VDD_26_27 | MMC_VDD_27_28 |
+				MMC_VDD_29_30 |
+				MMC_VDD_30_31 | MMC_VDD_31_32,
+	},
+#if !defined(CONFIG_PANEL_SHARP_LQ043T1DG01) && \
+		!defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
+	{
+		.mmc            = 2,
+		.wires          = 4,
+		.gpio_cd        = 175,
+		.gpio_wp        = 176,
+		.ocr_mask       = MMC_VDD_165_195,
+	},
+#endif
+	{}      /* Terminator */
+};
+
 static void __init am3517_evm_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
@@ -694,6 +736,8 @@ static void __init am3517_evm_init(void)
 
 	i2c_register_board_info(1, am3517evm_i2c1_boardinfo,
 				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
+	/* MMC init function */
+	omap2_hsmmc_init(mmc);
 }
 
 static void __init am3517_evm_map_io(void)

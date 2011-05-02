@@ -63,4 +63,4 @@ obj-$(CONFIG_AB4500_CORE)	+= ab4500-core.o
 obj-$(CONFIG_MFD_TIMBERDALE)    += timberdale.o
 obj-$(CONFIG_PMIC_ADP5520)	+= adp5520.o
 obj-$(CONFIG_LPC_SCH)		+= lpc_sch.o
-obj-$(CONFIG_MFD_TPS65910)	+= tps65910.o tps65910-gpio.o
+obj-$(CONFIG_MFD_TPS65910)	+= tps65910.o tps65910-gpio.o tps65910-irq.o

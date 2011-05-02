@@ -399,6 +399,14 @@ config LPC_SCH
 	  LPC bridge function of the Intel SCH provides support for
 	  System Management Bus and General Purpose I/O.
 
+config MFD_TPS65910
+	tristate "TPS65910 Power Management chip"
+	depends on I2C &&  GPIOLIB
+	select MFD_CORE
+	help
+	  if you say yes here you get support for the TPS65910 series of
+	  Power Management chips.
+
 endmenu
 
 menu "Multimedia Capabilities Port drivers"

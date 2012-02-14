@@ -92,7 +92,7 @@ static int __devinit mcp3k1_probe(struct spi_device *spi)
   dev_set_drvdata(&spi->dev, p_mcp3k1);
 
   status = device_create_file(&spi->dev, &dev_attr_mcp3k1);
-  if (!status) {
+  if (status != 0) {
     dev_dbg(&spi->dev, "mcp3k1: Device create file failed.\n");
   hwmon_reg_failed:
     p_mcp3k1->spi = NULL;

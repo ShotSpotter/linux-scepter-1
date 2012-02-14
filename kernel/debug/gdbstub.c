@@ -1166,8 +1166,10 @@ int gdbstub_state(struct kgdb_state *ks, char *cmd)
 	case '+':
 	case '$':
 		strcpy(remcom_in_buffer, cmd);
+#ifdef CONFIG_KGDB_KDB
 		gdbstub_use_prev_in_buf = strlen(remcom_in_buffer);
 		gdbstub_prev_in_buf_pos = 0;
+#endif
 		return 0;
 	}
 	dbg_io_ops->write_char('+');

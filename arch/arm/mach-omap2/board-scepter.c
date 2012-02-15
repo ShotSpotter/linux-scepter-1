@@ -60,7 +60,7 @@
 
 #define NAND_BLOCK_SIZE        SZ_128K
 
-static struct mtd_partition am3517evm_nand_partitions[] = {
+static struct mtd_partition scepter_nand_partitions[] = {
 	/* All the partition sizes are listed in terms of NAND block size */
 	{
 		.name           = "xloader",
@@ -91,9 +91,9 @@ static struct mtd_partition am3517evm_nand_partitions[] = {
 	},
 };
 
-static struct omap_nand_platform_data am3517evm_nand_data = {
-	.parts          = am3517evm_nand_partitions,
-	.nr_parts       = ARRAY_SIZE(am3517evm_nand_partitions),
+static struct omap_nand_platform_data scepter_nand_data = {
+	.parts          = scepter_nand_partitions,
+	.nr_parts       = ARRAY_SIZE(scepter_nand_partitions),
 	.nand_setup     = NULL,
 	.dma_channel    = -1,           /* disable DMA in OMAP NAND driver */
 	.devsize        = 1,
@@ -124,11 +124,11 @@ void __init am3517evm_flash_init(void)
 	}
 
 	if (nandcs < GPMC_CS_NUM) {
-		am3517evm_nand_data.cs   = nandcs;
-		am3517evm_nand_data.gpmc_cs_baseaddr = (void *)(gpmc_base_add +
+		scepter_nand_data.cs   = nandcs;
+		scepter_nand_data.gpmc_cs_baseaddr = (void *)(gpmc_base_add +
 				GPMC_CS0_BASE + nandcs*GPMC_CS_SIZE);
-		am3517evm_nand_data.gpmc_baseaddr   = (void *) (gpmc_base_add);
-		gpmc_nand_init(&am3517evm_nand_data);
+		scepter_nand_data.gpmc_baseaddr   = (void *) (gpmc_base_add);
+		gpmc_nand_init(&scepter_nand_data);
 	}
 }
 

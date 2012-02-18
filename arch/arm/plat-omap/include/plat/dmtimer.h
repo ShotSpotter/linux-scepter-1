@@ -73,6 +73,8 @@ void omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
 
 void omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
 
+void omap_dm_timer_set_tcm(struct omap_dm_timer *timer, int tcm);
+
 unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
 void omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
 unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);

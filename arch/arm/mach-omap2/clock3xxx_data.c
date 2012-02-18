@@ -1435,6 +1435,7 @@ static struct clk mad2d_ick = {
 static const struct clksel omap343x_gpt_clksel[] = {
 	{ .parent = &omap_32k_fck, .rates = gpt_32k_rates },
 	{ .parent = &sys_ck,	   .rates = gpt_sys_rates },
+	{ .parent = &osc_sys_ck,   .rates = gpt_sys_rates },
 	{ .parent = NULL}
 };
 

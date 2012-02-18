@@ -188,6 +188,7 @@ struct omap_dm_timer {
 	unsigned reserved:1;
 	unsigned enabled:1;
 	unsigned posted:1;
+	unsigned useosc:1;
 };
 
 static int dm_timer_count;
@@ -255,7 +256,7 @@ static struct omap_dm_timer omap3_dm_timers[] = {
 	{ .phys_base = 0x4903C000, .irq = INT_24XX_GPTIMER7 },
 	{ .phys_base = 0x4903E000, .irq = INT_24XX_GPTIMER8 },
 	{ .phys_base = 0x49040000, .irq = INT_24XX_GPTIMER9 },
-	{ .phys_base = 0x48086000, .irq = INT_24XX_GPTIMER10 },
+	{ .phys_base = 0x48086000, .irq = INT_24XX_GPTIMER10, .useosc = 1 },
 	{ .phys_base = 0x48088000, .irq = INT_24XX_GPTIMER11 },
 	{ .phys_base = 0x48304000, .irq = INT_34XX_GPT12_IRQ },
 };
@@ -263,10 +264,11 @@ static struct omap_dm_timer omap3_dm_timers[] = {
 static const char *omap3_dm_source_names[] __initdata = {
 	"sys_ck",
 	"omap_32k_fck",
+        "osc_sys_ck",
 	NULL
 };
 
-static struct clk *omap3_dm_source_clocks[2];
+static struct clk *omap3_dm_source_clocks[3];
 static const int omap3_dm_timer_count = ARRAY_SIZE(omap3_dm_timers);
 
 #else
@@ -397,12 +399,17 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
 static void omap_dm_timer_reset(struct omap_dm_timer *timer)
 {
 	u32 l;
+	int src;
 
 	if (!cpu_class_is_omap2() || timer != &dm_timers[0]) {
 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
 		omap_dm_timer_wait_for_reset(timer);
 	}
-	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+
+	src = (timer->useosc) \
+	    ? OMAP_TIMER_SRC_EXT_CLK \
+	    : OMAP_TIMER_SRC_32_KHZ;
+	omap_dm_timer_set_source(timer, src);
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
 	l |= 0x02 << 3;  /* Set to smart-idle mode */
@@ -745,6 +752,22 @@ void omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG, value);
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
+
+void omap_dm_timer_set_tcm(struct omap_dm_timer *timer, int mode)
+{
+	u32 l;
+
+        if (mode < 1 || mode > 3) {
+            return;
+        }
+
+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+        l &= ~((u32)OMAP_TIMER_CTRL_TCM_BOTHEDGES);
+        l |= (mode << 8);
+
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+}
+EXPORT_SYMBOL_GPL(omap_dm_timer_set_tcm);
 
 unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
 {

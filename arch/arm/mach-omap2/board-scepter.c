@@ -699,16 +699,16 @@ static struct omap2_hsmmc_info mmc[] = {
 				MMC_VDD_29_30 |
 				MMC_VDD_30_31 | MMC_VDD_31_32,
 	},
-#if !defined(CONFIG_PANEL_SHARP_LQ043T1DG01) && \
-		!defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
 	{
 		.mmc            = 2,
 		.wires          = 4,
-		.gpio_cd        = 175,
+		.gpio_cd        = 138,
 		.gpio_wp        = 176,
-		.ocr_mask       = MMC_VDD_165_195,
+		.ocr_mask       = MMC_VDD_165_195 |
+				MMC_VDD_26_27 | MMC_VDD_27_28 |
+				MMC_VDD_29_30 |
+				MMC_VDD_30_31 | MMC_VDD_31_32,
 	},
-#endif
 	{}      /* Terminator */
 };
 

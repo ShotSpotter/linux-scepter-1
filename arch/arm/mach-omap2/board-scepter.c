@@ -1,10 +1,10 @@
 /*
- * linux/arch/arm/mach-omap2/board-am3517evm.c
+ * linux/arch/arm/mach-omap2/board-scepter.c
  *
- * Copyright (C) 2009 Texas Instruments Incorporated
- * Author: Ranjith Lohithakshan <ranjithl@ti.com>
+ * Copyright (C) 2012 HY Research LLC 
+ * Author: Hunyue Yau <hy-git@hy-research.com>
  *
- * Based on mach-omap2/board-omap3evm.c
+ * Based on mach-omap2/board-am3517evm.c
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as  published by the
@@ -23,7 +23,6 @@
 #include <linux/davinci_emac.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/regulator/machine.h>
-#include <linux/i2c/tsc2004.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/nand.h>
@@ -39,7 +38,6 @@
 #include <plat/common.h>
 #include <plat/control.h>
 #include <plat/usb.h>
-#include <plat/display.h>
 #include <plat/nand.h>
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
@@ -50,10 +48,6 @@
 
 #include "hsmmc.h"
 #include "mux.h"
-
-#define LCD_PANEL_PWR		176
-#define LCD_PANEL_BKLIGHT_PWR	182
-#define LCD_PANEL_PWM		181
 
 #define GPMC_CS0_BASE  0x60
 #define GPMC_CS_SIZE   0x30
@@ -100,7 +94,7 @@ static struct omap_nand_platform_data scepter_nand_data = {
 	.dev_ready      = NULL,
 };
 
-void __init am3517evm_flash_init(void)
+void __init scepter_flash_init(void)
 {
 	u8 cs = 0;
 	u8 nandcs = GPMC_CS_NUM + 1;
@@ -133,10 +127,32 @@ void __init am3517evm_flash_init(void)
 }
 
 
+static struct gpio_led gpio_leds[] = {
+	{
+		.name			= "usr0",
+		.gpio			= 150,
+		.active_low		= true,
+	},
+};
+static struct gpio_led_platform_data gpio_led_info = {
+	.leds		= gpio_leds,
+	.num_leds	= ARRAY_SIZE(gpio_leds),
+};
+
+static struct platform_device leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &gpio_led_info,
+	},
+};
+
+
+
 #define AM35XX_EVM_PHY_MASK          (0xF)
 #define AM35XX_EVM_MDIO_FREQUENCY    (1000000) /*PHY bus frequency */
 
-static struct emac_platform_data am3517_evm_emac_pdata = {
+static struct emac_platform_data scepter_emac_pdata = {
 	.phy_mask       = AM35XX_EVM_PHY_MASK,
 	.mdio_max_freq  = AM35XX_EVM_MDIO_FREQUENCY,
 	.rmii_en        = 1,
@@ -151,7 +167,7 @@ static int __init eth_addr_setup(char *str)
 		return 0;
 	for (i = 0; i <  ETH_ALEN; i++) {
 		if (!strict_strtol(&str[i * 3], 16, &res))
-			am3517_evm_emac_pdata.mac_addr[i] = res;
+			scepter_emac_pdata.mac_addr[i] = res;
 		else
 			return -EINVAL;
 	}
@@ -220,7 +236,7 @@ static void am3517_disable_ethernet_int(void)
 	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
 }
 
-void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
+void scepter_ethernet_init(struct emac_platform_data *pdata)
 {
 	u32 regval;
 
@@ -360,58 +376,7 @@ static struct regulator_init_data am3517_evm_regulator_data[] = {
 	},
 };
 
-/*
- * TSC 2004 Support
- */
-#define	GPIO_TSC2004_IRQ	65
-
-static int tsc2004_init_irq(void)
-{
-	int ret = 0;
-
-	ret = gpio_request(GPIO_TSC2004_IRQ, "tsc2004-irq");
-	if (ret < 0) {
-		printk(KERN_WARNING "failed to request GPIO#%d: %d\n",
-				GPIO_TSC2004_IRQ, ret);
-		return ret;
-	}
-
-	ret = gpio_direction_input(GPIO_TSC2004_IRQ);
-	if (ret < 0) {
-		printk(KERN_WARNING "GPIO#%d cannot be configured as "
-				"input\n", GPIO_TSC2004_IRQ);
-		return -ENXIO;
-	}
-
-	omap_set_gpio_debounce(GPIO_TSC2004_IRQ, 1);
-	omap_set_gpio_debounce_time(GPIO_TSC2004_IRQ, 0xa);
-	return ret;
-}
-
-static void tsc2004_exit_irq(void)
-{
-	gpio_free(GPIO_TSC2004_IRQ);
-}
-
-static int tsc2004_get_irq_level(void)
-{
-	return gpio_get_value(GPIO_TSC2004_IRQ) ? 0 : 1;
-}
-
-struct tsc2004_platform_data am3517evm_tsc2004data = {
-	.model = 2004,
-	.x_plate_ohms = 180,
-	.get_pendown_state = tsc2004_get_irq_level,
-	.init_platform_hw = tsc2004_init_irq,
-	.exit_platform_hw = tsc2004_exit_irq,
-};
-
 static struct i2c_board_info __initdata am3517evm_i2c1_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tsc2004", 0x4B),
-		.type		= "tsc2004",
-		.platform_data	= &am3517evm_tsc2004data,
-	},
 	{
 		I2C_BOARD_INFO("s35390a", 0x30),
 		.type		= "s35390a",
@@ -496,173 +461,20 @@ static int __init am3517_evm_i2c_init(void)
 	return 0;
 }
 
-static int lcd_enabled;
-static int dvi_enabled;
-
-#if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
-		defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
-static void __init am3517_evm_display_init(void)
-{
-	int r;
-
-	omap_mux_init_gpio(LCD_PANEL_PWR, OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_gpio(LCD_PANEL_BKLIGHT_PWR, OMAP_PIN_INPUT_PULLDOWN);
-	omap_mux_init_gpio(LCD_PANEL_PWM, OMAP_PIN_INPUT_PULLDOWN);
-	/*
-	 * Enable GPIO 182 = LCD Backlight Power
-	 */
-	r = gpio_request(LCD_PANEL_BKLIGHT_PWR, "lcd_backlight_pwr");
-	if (r) {
-		printk(KERN_ERR "failed to get lcd_backlight_pwr\n");
-		return;
-	}
-	gpio_direction_output(LCD_PANEL_BKLIGHT_PWR, 1);
-	/*
-	 * Enable GPIO 181 = LCD Panel PWM
-	 */
-	r = gpio_request(LCD_PANEL_PWM, "lcd_pwm");
-	if (r) {
-		printk(KERN_ERR "failed to get lcd_pwm\n");
-		goto err_1;
-	}
-	gpio_direction_output(LCD_PANEL_PWM, 1);
-	/*
-	 * Enable GPIO 176 = LCD Panel Power enable pin
-	 */
-	r = gpio_request(LCD_PANEL_PWR, "lcd_panel_pwr");
-	if (r) {
-		printk(KERN_ERR "failed to get lcd_panel_pwr\n");
-		goto err_2;
-	}
-	gpio_direction_output(LCD_PANEL_PWR, 1);
-
-	printk(KERN_INFO "Display initialized successfully\n");
-	return;
-
-err_2:
-	gpio_free(LCD_PANEL_PWM);
-err_1:
-	gpio_free(LCD_PANEL_BKLIGHT_PWR);
-}
-
-static int am3517_evm_panel_enable_lcd(struct omap_dss_device *dssdev)
-{
-	if (dvi_enabled) {
-		printk(KERN_ERR "cannot enable LCD, DVI is enabled\n");
-		return -EINVAL;
-	}
-	gpio_set_value(LCD_PANEL_PWR, 1);
-	lcd_enabled = 1;
-
-	return 0;
-}
-
-static void am3517_evm_panel_disable_lcd(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(LCD_PANEL_PWR, 0);
-	lcd_enabled = 0;
-}
-#else
-static inline void __init am3517_evm_display_init(void)
-{
-}
-
-static inline int am3517_evm_panel_enable_lcd(struct omap_dss_device *dssdev)
-{
-	return 0;
-}
-
-static inline void am3517_evm_panel_disable_lcd(struct omap_dss_device *dssdev)
-{
-}
-#endif
-
-static struct omap_dss_device am3517_evm_lcd_device = {
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.name			= "lcd",
-	.driver_name		= "sharp_lq_panel",
-	.phy.dpi.data_lines 	= 16,
-	.platform_enable	= am3517_evm_panel_enable_lcd,
-	.platform_disable	= am3517_evm_panel_disable_lcd,
-};
-
-static int am3517_evm_panel_enable_tv(struct omap_dss_device *dssdev)
-{
-	return 0;
-}
-
-static void am3517_evm_panel_disable_tv(struct omap_dss_device *dssdev)
-{
-}
-
-static struct omap_dss_device am3517_evm_tv_device = {
-	.type 			= OMAP_DISPLAY_TYPE_VENC,
-	.name 			= "tv",
-	.driver_name		= "venc",
-	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
-	.platform_enable	= am3517_evm_panel_enable_tv,
-	.platform_disable	= am3517_evm_panel_disable_tv,
-};
-
-static int am3517_evm_panel_enable_dvi(struct omap_dss_device *dssdev)
-{
-	if (lcd_enabled) {
-		printk(KERN_ERR "cannot enable DVI, LCD is enabled\n");
-		return -EINVAL;
-	}
-	dvi_enabled = 1;
-
-	return 0;
-}
-
-static void am3517_evm_panel_disable_dvi(struct omap_dss_device *dssdev)
-{
-	dvi_enabled = 0;
-}
-
-static struct omap_dss_device am3517_evm_dvi_device = {
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.name			= "dvi",
-	.driver_name		= "generic_panel",
-	.phy.dpi.data_lines	= 24,
-	.platform_enable	= am3517_evm_panel_enable_dvi,
-	.platform_disable	= am3517_evm_panel_disable_dvi,
-};
-
-static struct omap_dss_device *am3517_evm_dss_devices[] = {
-	&am3517_evm_lcd_device,
-	&am3517_evm_tv_device,
-	&am3517_evm_dvi_device,
-};
-
-static struct omap_dss_board_info am3517_evm_dss_data = {
-	.num_devices	= ARRAY_SIZE(am3517_evm_dss_devices),
-	.devices	= am3517_evm_dss_devices,
-	.default_device	= &am3517_evm_lcd_device,
-};
-
-struct platform_device am3517_evm_dss_device = {
-	.name		= "omapdss",
-	.id		= -1,
-	.dev		= {
-		.platform_data	= &am3517_evm_dss_data,
-	},
-};
-
 /*
  * Board initialization
  */
-static struct omap_board_config_kernel am3517_evm_config[] __initdata = {
+static struct omap_board_config_kernel scepter_config[] __initdata = {
 };
 
-static struct platform_device *am3517_evm_devices[] __initdata = {
-	&am3517_evm_dss_device,
+static struct platform_device *scepter_devices[] __initdata = {
+	&leds_gpio,
 };
 
-static void __init am3517_evm_init_irq(void)
+static void __init scepter_init_irq(void)
 {
-	omap_board_config = am3517_evm_config;
-	omap_board_config_size = ARRAY_SIZE(am3517_evm_config);
+	omap_board_config = scepter_config;
+	omap_board_config_size = ARRAY_SIZE(scepter_config);
 
 	omap2_init_common_hw(NULL, NULL);
 	omap_init_irq();
@@ -713,59 +525,53 @@ static struct omap2_hsmmc_info mmc[] = {
 };
 
 static struct omap2_mcspi_device_config mcp3001_mcspi_config = {
-  .turbo_mode = 0,
-  .single_channel = 1,
+	.turbo_mode = 0,
+	.single_channel = 1,
 };
 
 static struct mcp3001_platform_data mcp3001_config __initdata = {
-  .nvals = 32,
+	.nvals = 32,
 };
 
-static struct spi_board_info am3517_evm_spi_board_info[] __initdata = {
-  {
-    .modalias      = "mcp3k1",
-    .bus_num       = 4,
-    .chip_select   = 0,
-    // 2.80MHz Vdd == 5V
-    // 1.05MHz Vdd == 2.7V
-    .max_speed_hz  = 1050000,
-    .controller_data = &mcp3001_mcspi_config,
-    .irq           = -1,
-    .platform_data = &mcp3001_config,
-  }
+static struct spi_board_info scepter_spi_board_info[] __initdata = {
+	{
+		.modalias		= "mcp3k1",
+		.bus_num		= 4,
+		.chip_select		= 0,
+		// 2.80MHz Vdd == 5V
+		// 1.05MHz Vdd == 2.7V
+		.max_speed_hz		= 1050000,
+		.controller_data	= &mcp3001_mcspi_config,
+		.irq			= -1,
+		.platform_data		= &mcp3001_config,
+	}
 };
 
-static void __init am3517_evm_spi_init(void)
+static void __init scepter_spi_init(void)
 {
-  spi_register_board_info(am3517_evm_spi_board_info,
-			  ARRAY_SIZE(am3517_evm_spi_board_info));
+	spi_register_board_info(scepter_spi_board_info,
+			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
 
 
-static void __init am3517_evm_init(void)
+static void __init scepter_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
 
 	am3517_evm_i2c_init();
-	platform_add_devices(am3517_evm_devices,
-				ARRAY_SIZE(am3517_evm_devices));
+	platform_add_devices(scepter_devices,
+				ARRAY_SIZE(scepter_devices));
 
-	am3517_evm_spi_init();
+	scepter_spi_init();
 	omap_serial_init();
-	am3517evm_flash_init();
+	scepter_flash_init();
 
 	/* Configure GPIO for EHCI port */
 	omap_mux_init_gpio(57, OMAP_PIN_OUTPUT);
 	usb_ehci_init(&ehci_pdata);
-	/* DSS */
-	am3517_evm_display_init();
 
-	am3517_evm_ethernet_init(&am3517_evm_emac_pdata);
-
-	/* TSC 2004 */
-	omap_mux_init_gpio(GPIO_TSC2004_IRQ, OMAP_PIN_INPUT_PULLUP);
-	am3517evm_i2c1_boardinfo[0].irq = gpio_to_irq(GPIO_TSC2004_IRQ);
+	scepter_ethernet_init(&scepter_emac_pdata);
 
 	/* RTC - S35390A */
 	am3517_evm_rtc_init();
@@ -776,18 +582,21 @@ static void __init am3517_evm_init(void)
 	omap2_hsmmc_init(mmc);
 }
 
-static void __init am3517_evm_map_io(void)
+static void __init scepter_map_io(void)
 {
 	omap2_set_globals_343x();
 	omap34xx_map_common_io();
 }
-
-MACHINE_START(OMAP3517EVM, "OMAP3517/AM3517 EVM")
+#if 0
+MACHINE_START(SCEPTER, "Scepter Board")
+#else
+MACHINE_START(OMAP3517EVM, "Scepter Board")
+#endif
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
-	.map_io		= am3517_evm_map_io,
-	.init_irq	= am3517_evm_init_irq,
-	.init_machine	= am3517_evm_init,
+	.map_io		= scepter_map_io,
+	.init_irq	= scepter_init_irq,
+	.init_machine	= scepter_init,
 	.timer		= &omap_timer,
 MACHINE_END

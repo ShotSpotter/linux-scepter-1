@@ -1666,6 +1666,17 @@ static struct clk mcspi1_fck = {
 	.recalc		= &followparent_recalc,
 };
 
+/* Per AM3517 TRM */
+static struct clk uart4_fck = {
+	.name		= "uart4_fck",
+	.ops		= &clkops_omap2_dflt_wait,
+	.parent		= &core_48m_fck,
+	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+	.enable_bit	= 23,
+	.clkdm_name	= "core_l4_clkdm",
+	.recalc		= &followparent_recalc,
+};
+
 static struct clk uart2_fck = {
 	.name		= "uart2_fck",
 	.ops		= &clkops_omap2_dflt_wait,
@@ -3364,6 +3375,7 @@ static struct omap_clk omap3xxx_clks[] = {
 	CLK("omap2_mcspi.3", "fck",	&mcspi3_fck,	CK_3XXX),
 	CLK("omap2_mcspi.2", "fck",	&mcspi2_fck,	CK_3XXX),
 	CLK("omap2_mcspi.1", "fck",	&mcspi1_fck,	CK_3XXX),
+	CLK(NULL,	"uart4_fck",	&uart4_fck,	CK_3XXX),
 	CLK(NULL,	"uart2_fck",	&uart2_fck,	CK_3XXX),
 	CLK(NULL,	"uart1_fck",	&uart1_fck,	CK_3XXX),
 	CLK(NULL,	"fshostusb_fck", &fshostusb_fck, CK_3430ES1),

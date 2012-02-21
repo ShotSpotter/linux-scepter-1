@@ -22,6 +22,7 @@
 #include <linux/gpio.h>
 #include <linux/davinci_emac.h>
 #include <linux/i2c/pca953x.h>
+#include <linux/i2c/at24.h>
 #include <linux/regulator/machine.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
@@ -459,31 +460,19 @@ static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
 	},
 };
 
-/* Mounted on UI Card */
-static struct pca953x_platform_data am3517evm_ui_gpio_expander_info_1 = {
-	.gpio_base	= OMAP_MAX_GPIO_LINES + 16,
-};
-static struct pca953x_platform_data am3517evm_ui_gpio_expander_info_2 = {
-	.gpio_base	= OMAP_MAX_GPIO_LINES + 32,
-};
-static struct i2c_board_info __initdata am3517evm_i2c3_boardinfo[] = {
+static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 	{
-		I2C_BOARD_INFO("tca6416", 0x20),
-		.platform_data = &am3517evm_ui_gpio_expander_info_1,
-	},
-	{
-		I2C_BOARD_INFO("tca6416", 0x21),
-		.platform_data = &am3517evm_ui_gpio_expander_info_2,
+		I2C_BOARD_INFO("24c64", 0x50),
 	},
 };
 
-static int __init am3517_evm_i2c_init(void)
+static int __init scepter_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 200, NULL, 0);
 	omap_register_i2c_bus(2, 400, am3517evm_i2c2_boardinfo,
 			ARRAY_SIZE(am3517evm_i2c2_boardinfo));
-	omap_register_i2c_bus(3, 400, am3517evm_i2c3_boardinfo,
-			ARRAY_SIZE(am3517evm_i2c3_boardinfo));
+	omap_register_i2c_bus(3, 400, scepter_i2c3_boardinfo,
+			ARRAY_SIZE(scepter_i2c3_boardinfo));
 
 	return 0;
 }
@@ -586,7 +575,7 @@ static void __init scepter_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
 
-	am3517_evm_i2c_init();
+	scepter_i2c_init();
 	platform_add_devices(scepter_devices,
 				ARRAY_SIZE(scepter_devices));
 

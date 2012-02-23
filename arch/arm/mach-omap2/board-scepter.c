@@ -552,12 +552,13 @@ static struct mcp3001_platform_data mcp3001_config __initdata = {
 static struct spi_board_info scepter_spi_board_info[] __initdata = {
 	{
 		.modalias		= "mcp3k1",
-		.bus_num		= 4,
+		.bus_num		= 1,
 		.chip_select		= 0,
 		// 2.80MHz Vdd == 5V
 		// 1.05MHz Vdd == 2.7V
 		.max_speed_hz		= 1050000,
 		.controller_data	= &mcp3001_mcspi_config,
+		.mode			= SPI_MODE_3,
 		.irq			= -1,
 		.platform_data		= &mcp3001_config,
 	}

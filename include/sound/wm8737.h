@@ -1,5 +1,5 @@
 /*
- * wm8737-sync.h - header for synchronized wm8737's omap driver
+ * wm8737.h
  *
  * Author: Sarah Newman <snewman@shotspotter.com>
  *
@@ -22,23 +22,15 @@
  *
  */
 
-#ifndef _WM8737_SYNC_H
-#define _WM8737_SYNC_H
+#ifndef WM8737_H_
+#define WM8737_H_
 
-#define MAX_WM8737_SLAVES 3
+#define MAX_WM8737_ID 3
+#define MAX_WM8737_CNT (MAX_WM8737_ID+1)
 
-struct wm8737_audio_data {
-	int mcbsp;
+struct wm8737_platform_data {
 	int id;
 };
 
-struct wm8737_sync_platform_data {
-	int cntr_rst_gpio;
-	int mclk_gate_gpio;
-	int audio_mclk;
-	wm8737_audio_data *master;
-	wm8737_audio_data *slaves;
-	int num_slaves;
-};
 
-#endif
+#endif /* WM8737_H_ */

@@ -31,9 +31,11 @@
 #include <sound/initval.h>
 #include <sound/tlv.h>
 
+#include <sound/wm8737.h>
 #include "wm8737.h"
 
-static struct snd_soc_codec *wm8737_codec;
+static struct snd_soc_codec *wm8737_codec[MAX_WM8737_CNT];
+
 struct snd_soc_codec_device soc_codec_dev_wm8737;
 
 #define WM8737_NUM_SUPPLIES 4
@@ -50,6 +52,7 @@ struct wm8737_priv {
 	struct regulator_bulk_data supplies[WM8737_NUM_SUPPLIES];
 	u16 reg_cache[WM8737_REGISTER_COUNT];
 	unsigned int mclk;
+	int id;
 };
 
 
@@ -752,6 +755,7 @@ static int __devinit wm8737_spi_probe(struct spi_device *spi)
 {
 	struct snd_soc_codec *codec;
 	struct wm8737_priv *wm8737;
+	struct wm8737_platform_data *pdata = spi->dev.platform_data;
 
 	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
 	if (wm8737 == NULL)
@@ -762,6 +766,11 @@ static int __devinit wm8737_spi_probe(struct spi_device *spi)
 	codec->dev = &spi->dev;
 
 	dev_set_drvdata(&spi->dev, wm8737);
+
+	if(pdata && pdata->id >= 0)
+		wm8737_priv->id = pdata->id;
+	else
+		wm8737_priv->id = -1;
 
 	return wm8737_register(wm8737, SND_SOC_SPI);
 }
@@ -792,6 +801,7 @@ static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
 {
 	struct wm8737_priv *wm8737;
 	struct snd_soc_codec *codec;
+	struct wm8737_platform_data *pdata = i2c->dev.platform_data;
 
 	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
 	if (wm8737 == NULL)
@@ -803,6 +813,11 @@ static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
 	codec->control_data = i2c;
 
 	codec->dev = &i2c->dev;
+
+	if(pdata && pdata->id >= 0)
+		wm8737_priv->id = pdata->id;
+	else
+		wm8737_priv->id = -1;
 
 	return wm8737_register(wm8737, SND_SOC_I2C);
 }
@@ -834,6 +849,9 @@ static struct i2c_driver wm8737_i2c_driver = {
 static int __init wm8737_modinit(void)
 {
 	int ret;
+	for(int i=0; i < ARRAY_SIZE(wm8737_codec); i++) {
+			wm8737_codec[i] = NULL;
+	}
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	ret = i2c_add_driver(&wm8737_i2c_driver);
 	if (ret != 0) {

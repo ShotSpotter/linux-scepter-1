@@ -13,6 +13,9 @@
  * published by the Free Software Foundation.
  */
 
+struct wm8737_setup_data {
+	int id;
+};
 /*
  * Register values.
  */

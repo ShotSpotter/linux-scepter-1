@@ -1,7 +1,7 @@
 /*
- * scepter.c  --  SoC audio for scepter
+ * wm8737-sync.c  --  audio for synchronized wm8737's
  *
- * Copyright (C) 2011 ShotSpotter Inc.
+ * Copyright (C) 2012 ShotSpotter Inc.
  *
  * Author: Sarah Newman <snewman@shotspotter.com>
  *
@@ -35,15 +35,13 @@
 #include <mach/hardware.h>
 #include <mach/gpio.h>
 #include <plat/mcbsp.h>
+#include <mach/scepter.h>
 
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
-#include "../codecs/twl4030.h"
+#include "../codecs/wm8737.h"
 
-#define ZOOM2_HEADSET_MUX_GPIO		(OMAP_MAX_GPIO_LINES + 15)
-#define ZOOM2_HEADSET_EXTMUTE_GPIO	153
-
-static int zoom2_hw_params(struct snd_pcm_substream *substream,
+static int scepter_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -82,11 +80,11 @@ static int zoom2_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static struct snd_soc_ops zoom2_ops = {
-	.hw_params = zoom2_hw_params,
+static struct snd_soc_ops scepter_ops = {
+	.hw_params = scepter_hw_params,
 };
 
-static int zoom2_hw_voice_params(struct snd_pcm_substream *substream,
+static int scepter_hw_voice_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -125,12 +123,12 @@ static int zoom2_hw_voice_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static struct snd_soc_ops zoom2_voice_ops = {
-	.hw_params = zoom2_hw_voice_params,
+static struct snd_soc_ops scepter_voice_ops = {
+	.hw_params = scepter_hw_voice_params,
 };
 
-/* Zoom2 machine DAPM */
-static const struct snd_soc_dapm_widget zoom2_twl4030_dapm_widgets[] = {
+/* Scepter machine DAPM */
+static const struct snd_soc_dapm_widget scepter_twl4030_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Ext Mic", NULL),
 	SND_SOC_DAPM_SPK("Ext Spk", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
@@ -162,20 +160,20 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Aux In", NULL, "AUXR"},
 };
 
-static int zoom2_twl4030_init(struct snd_soc_codec *codec)
+static int scepter_twl4030_init(struct snd_soc_codec *codec)
 {
 	int ret;
 
-	/* Add Zoom2 specific widgets */
-	ret = snd_soc_dapm_new_controls(codec, zoom2_twl4030_dapm_widgets,
-				ARRAY_SIZE(zoom2_twl4030_dapm_widgets));
+	/* Add Scepter specific widgets */
+	ret = snd_soc_dapm_new_controls(codec, scepter_twl4030_dapm_widgets,
+				ARRAY_SIZE(scepter_twl4030_dapm_widgets));
 	if (ret)
 		return ret;
 
-	/* Set up Zoom2 specific audio path audio_map */
+	/* Set up Scepter specific audio path audio_map */
 	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
 
-	/* Zoom2 connected pins */
+	/* Scepter connected pins */
 	snd_soc_dapm_enable_pin(codec, "Ext Mic");
 	snd_soc_dapm_enable_pin(codec, "Ext Spk");
 	snd_soc_dapm_enable_pin(codec, "Headset Mic");
@@ -200,7 +198,7 @@ static int zoom2_twl4030_init(struct snd_soc_codec *codec)
 	return ret;
 }
 
-static int zoom2_twl4030_voice_init(struct snd_soc_codec *codec)
+static int scepter_twl4030_voice_init(struct snd_soc_codec *codec)
 {
 	unsigned short reg;
 
@@ -213,37 +211,37 @@ static int zoom2_twl4030_voice_init(struct snd_soc_codec *codec)
 }
 
 /* Digital audio interface glue - connects codec <--> CPU */
-static struct snd_soc_dai_link zoom2_dai[] = {
+static struct snd_soc_dai_link scepter_dai[] = {
 	{
 		.name = "TWL4030 I2S",
 		.stream_name = "TWL4030 Audio",
 		.cpu_dai = &omap_mcbsp_dai[0],
 		.codec_dai = &twl4030_dai[TWL4030_DAI_HIFI],
-		.init = zoom2_twl4030_init,
-		.ops = &zoom2_ops,
+		.init = scepter_twl4030_init,
+		.ops = &scepter_ops,
 	},
 	{
 		.name = "TWL4030 PCM",
 		.stream_name = "TWL4030 Voice",
 		.cpu_dai = &omap_mcbsp_dai[1],
 		.codec_dai = &twl4030_dai[TWL4030_DAI_VOICE],
-		.init = zoom2_twl4030_voice_init,
-		.ops = &zoom2_voice_ops,
+		.init = scepter_twl4030_voice_init,
+		.ops = &scepter_voice_ops,
 	},
 };
 
 /* Audio machine driver */
-static struct snd_soc_card snd_soc_zoom2 = {
-	.name = "Zoom2",
+static struct snd_soc_card snd_soc_scepter = {
+	.name = "Scepter",
 	.platform = &omap_soc_platform,
-	.dai_link = zoom2_dai,
-	.num_links = ARRAY_SIZE(zoom2_dai),
+	.dai_link = scepter_dai,
+	.num_links = ARRAY_SIZE(scepter_dai),
 };
 
 /* EXTMUTE callback function */
-void zoom2_set_hs_extmute(int mute)
+void scepter_set_hs_extmute(int mute)
 {
-	gpio_set_value(ZOOM2_HEADSET_EXTMUTE_GPIO, mute);
+	gpio_set_value(Scepter_HEADSET_EXTMUTE_GPIO, mute);
 }
 
 /* twl4030 setup */
@@ -251,69 +249,70 @@ static struct twl4030_setup_data twl4030_setup = {
 	.ramp_delay_value = 3,	/* 161 ms */
 	.sysclk = 26000,
 	.hs_extmute = 1,
-	.set_hs_extmute = zoom2_set_hs_extmute,
+	.set_hs_extmute = scepter_set_hs_extmute,
 };
 
 /* Audio subsystem */
-static struct snd_soc_device zoom2_snd_devdata = {
-	.card = &snd_soc_zoom2,
+static struct snd_soc_device scepter_snd_devdata = {
+	.card = &snd_soc_scepter,
 	.codec_dev = &soc_codec_dev_twl4030,
 	.codec_data = &twl4030_setup,
 };
 
-static struct platform_device *zoom2_snd_device;
+static struct platform_device *scepter_snd_device;
 
-static int __init zoom2_soc_init(void)
+static int __init scepter_soc_init(void)
 {
 	int ret;
 
-	if (!machine_is_omap_zoom2()) {
-		pr_debug("Not Zoom2!\n");
+	if (!machine_is_omap_scepter()) {
+		pr_debug("Not Scepter!\n");
 		return -ENODEV;
 	}
-	printk(KERN_INFO "Zoom2 SoC init\n");
+	printk(KERN_INFO "Scepter SoC init\n");
 
-	zoom2_snd_device = platform_device_alloc("soc-audio", -1);
-	if (!zoom2_snd_device) {
+	scepter_snd_device = platform_device_alloc("soc-audio", -1);
+	if (!scepter_snd_device) {
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;
 	}
 
-	platform_set_drvdata(zoom2_snd_device, &zoom2_snd_devdata);
-	zoom2_snd_devdata.dev = &zoom2_snd_device->dev;
-	*(unsigned int *)zoom2_dai[0].cpu_dai->private_data = 1; /* McBSP2 */
-	*(unsigned int *)zoom2_dai[1].cpu_dai->private_data = 2; /* McBSP3 */
+	platform_set_drvdata(scepter_snd_device, &scepter_snd_devdata);
+	scepter_snd_devdata.dev = &scepter_snd_device->dev;
+	*(unsigned int *)scepter_dai[0].cpu_dai->private_data = 0; /* McBSP1 */
+	*(unsigned int *)scepter_dai[1].cpu_dai->private_data = 1; /* McBSP2 */
+	*(unsigned int *)scepter_dai[2].cpu_dai->private_data = 2; /* McBSP3 */
 
-	ret = platform_device_add(zoom2_snd_device);
+	ret = platform_device_add(scepter_snd_device);
 	if (ret)
 		goto err1;
 
-	BUG_ON(gpio_request(ZOOM2_HEADSET_MUX_GPIO, "hs_mux") < 0);
-	gpio_direction_output(ZOOM2_HEADSET_MUX_GPIO, 0);
+	BUG_ON(gpio_request(Scepter_HEADSET_MUX_GPIO, "hs_mux") < 0);
+	gpio_direction_output(Scepter_HEADSET_MUX_GPIO, 0);
 
-	BUG_ON(gpio_request(ZOOM2_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
-	gpio_direction_output(ZOOM2_HEADSET_EXTMUTE_GPIO, 0);
+	BUG_ON(gpio_request(Scepter_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
+	gpio_direction_output(Scepter_HEADSET_EXTMUTE_GPIO, 0);
 
 	return 0;
 
 err1:
 	printk(KERN_ERR "Unable to add platform device\n");
-	platform_device_put(zoom2_snd_device);
+	platform_device_put(scepter_snd_device);
 
 	return ret;
 }
-module_init(zoom2_soc_init);
+module_init(scepter_soc_init);
 
-static void __exit zoom2_soc_exit(void)
+static void __exit scepter_soc_exit(void)
 {
-	gpio_free(ZOOM2_HEADSET_MUX_GPIO);
-	gpio_free(ZOOM2_HEADSET_EXTMUTE_GPIO);
+	gpio_free();
+	gpio_free();
 
-	platform_device_unregister(zoom2_snd_device);
+	platform_device_unregister(scepter_snd_device);
 }
-module_exit(zoom2_soc_exit);
+module_exit(scepter_soc_exit);
 
-MODULE_AUTHOR("Misael Lopez Cruz <x0052729@ti.com>");
-MODULE_DESCRIPTION("ALSA SoC Zoom2");
+MODULE_AUTHOR("Sarah Newman <snewman@shotspotter.com>");
+MODULE_DESCRIPTION("ALSA SoC Scepter");
 MODULE_LICENSE("GPL");
 

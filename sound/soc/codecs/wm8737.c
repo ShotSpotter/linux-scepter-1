@@ -604,15 +604,27 @@ static int wm8737_probe(struct platform_device *pdev)
 {
 	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
 	struct snd_soc_codec *codec;
+	struct wm8737_setup_data *setup = socdev->codec_data;
 	int ret = 0;
+	int id;
 
-	if (wm8737_codec == NULL) {
-		dev_err(&pdev->dev, "Codec device not registered\n");
+	if(setup && setup->id > MAX_WM8737_ID) {
+		dev_err(&pdev->dev, "Invalid wm8737 ID of %d\n",setup->id);
+		return -EINVAL;
+	}
+
+	if(setup && setup->id >= 0)
+		id = setup->id;
+	else
+		id = 0;
+
+	if (wm8737_codec[id] == NULL) {
+		dev_err(&pdev->dev, "Codec device not registered at %i\n",id);
 		return -ENODEV;
 	}
 
-	socdev->card->codec = wm8737_codec;
-	codec = wm8737_codec;
+	socdev->card->codec = wm8737_codec[id];
+	codec = wm8737_codec[id];
 
 	/* register pcms */
 	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
@@ -655,9 +667,10 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 {
 	int ret, i;
 	struct snd_soc_codec *codec = &wm8737->codec;
+	int id = wm8737->id;
 
-	if (wm8737_codec) {
-		dev_err(codec->dev, "Another wm8737 is registered\n");
+	if (wm8737_codec[id]) {
+		dev_err(codec->dev, "Another wm8737 is registered for %d\n",id);
 		ret = -EINVAL;
 		goto err;
 	}
@@ -711,7 +724,7 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 
 	wm8737_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
-	wm8737_codec = codec;
+	wm8737_codec[id] = codec;
 
 	ret = snd_soc_register_codec(codec);
 	if (ret != 0) {
@@ -747,7 +760,7 @@ static void wm8737_unregister(struct wm8737_priv *wm8737)
 	regulator_bulk_disable(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
 	regulator_bulk_free(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
 	kfree(wm8737);
-	wm8737_codec = NULL;
+	wm8737_codec[id] = NULL;
 }
 
 #if defined(CONFIG_SPI_MASTER)
@@ -756,6 +769,16 @@ static int __devinit wm8737_spi_probe(struct spi_device *spi)
 	struct snd_soc_codec *codec;
 	struct wm8737_priv *wm8737;
 	struct wm8737_platform_data *pdata = spi->dev.platform_data;
+
+	if(pdata && pdata->id > MAX_WM8737_ID) {
+		dev_err(&spi->dev, "Invalid wm8737 ID of %d\n",pdata->id);
+		return -EINVAL;
+	}
+
+	if(pdata && pdata->id >= 0)
+		wm8737_priv->id = pdata->id;
+	else
+		wm8737_priv->id = 0;
 
 	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
 	if (wm8737 == NULL)
@@ -766,11 +789,6 @@ static int __devinit wm8737_spi_probe(struct spi_device *spi)
 	codec->dev = &spi->dev;
 
 	dev_set_drvdata(&spi->dev, wm8737);
-
-	if(pdata && pdata->id >= 0)
-		wm8737_priv->id = pdata->id;
-	else
-		wm8737_priv->id = -1;
 
 	return wm8737_register(wm8737, SND_SOC_SPI);
 }
@@ -803,6 +821,16 @@ static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
 	struct snd_soc_codec *codec;
 	struct wm8737_platform_data *pdata = i2c->dev.platform_data;
 
+	if(pdata && pdata->id > MAX_WM8737_ID) {
+		dev_err(&spi->dev, "Invalid wm8737 ID of %d\n",pdata->id);
+		return -EINVAL;
+	}
+
+	if(pdata && pdata->id >= 0)
+		wm8737_priv->id = pdata->id;
+	else
+		wm8737_priv->id = 0;
+
 	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
 	if (wm8737 == NULL)
 		return -ENOMEM;
@@ -813,11 +841,6 @@ static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
 	codec->control_data = i2c;
 
 	codec->dev = &i2c->dev;
-
-	if(pdata && pdata->id >= 0)
-		wm8737_priv->id = pdata->id;
-	else
-		wm8737_priv->id = -1;
 
 	return wm8737_register(wm8737, SND_SOC_I2C);
 }
@@ -849,9 +872,6 @@ static struct i2c_driver wm8737_i2c_driver = {
 static int __init wm8737_modinit(void)
 {
 	int ret;
-	for(int i=0; i < ARRAY_SIZE(wm8737_codec); i++) {
-			wm8737_codec[i] = NULL;
-	}
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	ret = i2c_add_driver(&wm8737_i2c_driver);
 	if (ret != 0) {

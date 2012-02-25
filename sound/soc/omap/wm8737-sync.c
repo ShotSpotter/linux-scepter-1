@@ -26,51 +26,77 @@
 
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/slab.h>
+#include <linux/workqueue.h>
+#include <linux/delay.h>
+
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 
-#include <asm/mach-types.h>
-#include <mach/hardware.h>
 #include <mach/gpio.h>
-#include <plat/mcbsp.h>
-#include <mach/scepter.h>
+#include <plat/wm8737-sync.h>
+#include <sound/wm8737.h>
+
 
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
 #include "../codecs/wm8737.h"
 
-static int wm8737_omap_hw_params(struct snd_pcm_substream *substream,
+
+
+/*TODO consider if wm8737 omap specific stuff and sync-specific stuff can be broken into 2 modules */
+
+struct wm8737_sync_soc {
+	struct snd_soc_card sound_soc;
+	struct snd_soc_device snd_devdata;
+	struct wm8737_setup_data wm8737_setup;
+	struct platform_device *snd_device;
+	struct snd_soc_dai_link dai;
+	unsigned int codec_daifmt;
+	unsigned int cpu_daifmt;
+	struct wm8737_sync_data *sync_data;
+};
+
+struct wm8737_sync_data {
+	int cnt_rst_gpio;
+	int mclk_en_gpio;
+	unsigned int mclk;
+	struct wm8737_sync_soc master;
+	struct wm8737_sync_soc slaves[MAX_WM8737_SLAVES];
+	struct work_struct trigger_start_work;
+	struct work_struct trigger_stop_work;
+
+};
+
+
+static int wm8737_sync_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct wm8737_sync_soc *wm8737_soc = container_of(rtd->dai,struct wm8737_sync_soc,dai);
 	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
+	
 	int ret;
 
 	/* Set codec DAI configuration */
-	ret = snd_soc_dai_set_fmt(codec_dai,
-				  SND_SOC_DAIFMT_I2S |
-				  SND_SOC_DAIFMT_NB_NF |
-				  SND_SOC_DAIFMT_CBM_CFM);
+	ret = snd_soc_dai_set_fmt(codec_dai,wm8737_soc->codec_daifmt);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set codec DAI configuration\n");
 		return ret;
 	}
 
 	/* Set cpu DAI configuration */
-	ret = snd_soc_dai_set_fmt(cpu_dai,
-				  SND_SOC_DAIFMT_I2S |
-				  SND_SOC_DAIFMT_NB_NF |
-				  SND_SOC_DAIFMT_CBM_CFM);
+	ret = snd_soc_dai_set_fmt(cpu_dai,wm8737_soc->cpu_daifmt);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set cpu DAI configuration\n");
 		return ret;
 	}
 
 	/* Set the codec system clock for DAC and ADC */
-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 26000000,
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, wm8737_soc->sync_data->mclk,
 					SND_SOC_CLOCK_IN);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set codec system clock\n");
@@ -80,183 +106,249 @@ static int wm8737_omap_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static struct snd_soc_ops wm8737_omap_ops = {
-	.hw_params = wm8737_omap_hw_params,
-};
+static int wm8737_master_sync_prepare(struct snd_pcm_substream *substream) {
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct wm8737_sync_soc *wm8737_soc = container_of(rtd->dai,struct wm8737_sync_soc,dai);
+	struct wm8737_sync_data *sync_data = wm8737_soc->sync_data;
 
-/* Wm8737_omap machine DAPM */
-static const struct snd_soc_dapm_widget wm8737_omap_twl4030_dapm_widgets[] = {
-	SND_SOC_DAPM_MIC("Ext Mic", NULL),
-	SND_SOC_DAPM_SPK("Ext Spk", NULL),
-	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
-	SND_SOC_DAPM_LINE("Aux In", NULL),
-};
+	runtime->hw.info &= ~(SNDRV_PCM_INFO_RESUME | SNDRV_PCM_INFO_PAUSE);
 
-static const struct snd_soc_dapm_route audio_map[] = {
-	/* External Mics: MAINMIC, SUBMIC with bias*/
-	{"MAINMIC", NULL, "Mic Bias 1"},
-	{"SUBMIC", NULL, "Mic Bias 2"},
-	{"Mic Bias 1", NULL, "Ext Mic"},
-	{"Mic Bias 2", NULL, "Ext Mic"},
+	if(gpio_is_valid(sync_data->mclk_en_gpio) && (0 != gpio_get_value(sync_data->mclk_en_gpio)))
+		return -EPERM;
 
-	/* External Speakers: HFL, HFR */
-	{"Ext Spk", NULL, "HFL"},
-	{"Ext Spk", NULL, "HFR"},
-
-	/* Headset Stereophone:  HSOL, HSOR */
-	{"Headset Stereophone", NULL, "HSOL"},
-	{"Headset Stereophone", NULL, "HSOR"},
-
-	/* Headset Mic: HSMIC with bias */
-	{"HSMIC", NULL, "Headset Mic Bias"},
-	{"Headset Mic Bias", NULL, "Headset Mic"},
-
-	/* Aux In: AUXL, AUXR */
-	{"Aux In", NULL, "AUXL"},
-	{"Aux In", NULL, "AUXR"},
-};
-
-static int wm8737_omap_twl4030_init(struct snd_soc_codec *codec)
-{
-	int ret;
-
-	/* Add Wm8737_omap specific widgets */
-	ret = snd_soc_dapm_new_controls(codec, wm8737_omap_twl4030_dapm_widgets,
-				ARRAY_SIZE(wm8737_omap_twl4030_dapm_widgets));
-	if (ret)
-		return ret;
-
-	/* Set up Wm8737_omap specific audio path audio_map */
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
-
-	/* Wm8737_omap connected pins */
-	snd_soc_dapm_enable_pin(codec, "Ext Mic");
-	snd_soc_dapm_enable_pin(codec, "Ext Spk");
-	snd_soc_dapm_enable_pin(codec, "Headset Mic");
-	snd_soc_dapm_enable_pin(codec, "Headset Stereophone");
-	snd_soc_dapm_enable_pin(codec, "Aux In");
-
-	/* TWL4030 not connected pins */
-	snd_soc_dapm_nc_pin(codec, "CARKITMIC");
-	snd_soc_dapm_nc_pin(codec, "DIGIMIC0");
-	snd_soc_dapm_nc_pin(codec, "DIGIMIC1");
-
-	snd_soc_dapm_nc_pin(codec, "OUTL");
-	snd_soc_dapm_nc_pin(codec, "OUTR");
-	snd_soc_dapm_nc_pin(codec, "EARPIECE");
-	snd_soc_dapm_nc_pin(codec, "PREDRIVEL");
-	snd_soc_dapm_nc_pin(codec, "PREDRIVER");
-	snd_soc_dapm_nc_pin(codec, "CARKITL");
-	snd_soc_dapm_nc_pin(codec, "CARKITR");
-
-	ret = snd_soc_dapm_omap(codec);
-
-	return ret;
-}
-
-/* Digital audio interface glue - connects codec <--> CPU */
-static struct snd_soc_dai_link wm8737_omap_dai[] = {
-	{
-		.name = "TWL4030 I2S",
-		.stream_name = "TWL4030 Audio",
-		.cpu_dai = &omap_mcbsp_dai[0],
-		.codec_dai = &twl4030_dai[TWL4030_DAI_HIFI],
-		.init = wm8737_omap_twl4030_init,
-		.ops = &wm8737_omap_ops,
+	if(gpio_is_valid(sync_data->cnt_rst_gpio)) {
+		gpio_set_value(sync_data->cnt_rst_gpio,0);
+		udelay(1);
 	}
-};
 
-/* Audio machine driver */
-static struct snd_soc_card snd_soc_wm8737_omap = {
-	.name = "Wm8737_omap",
-	.platform = &omap_soc_platform,
-	.dai_link = wm8737_omap_dai,
-	.num_links = ARRAY_SIZE(wm8737_omap_dai),
-};
-
-/* EXTMUTE callback function */
-void wm8737_omap_set_hs_extmute(int mute)
-{
-	gpio_set_value(Wm8737_omap_HEADSET_EXTMUTE_GPIO, mute);
+	return 0;
 }
 
-/* Audio subsystem */
-static struct snd_soc_device wm8737_omap_snd_devdata = {
-	.card = &snd_soc_wm8737_omap,
-	.codec_dev = &soc_codec_dev_twl4030,
-	.codec_data = &twl4030_setup,
+static int wm8737_master_sync_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct wm8737_sync_soc *wm8737_soc = container_of(rtd->dai,struct wm8737_sync_soc,dai);
+	struct wm8737_sync_data *sync_data = wm8737_soc->sync_data;
+	int err = 0;
+	
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		schedule_work(&sync_data->trigger_start_work);
+		break;
+
+	case SNDRV_PCM_TRIGGER_STOP:
+		schedule_work(&sync_data->trigger_stop_work);
+		break;
+
+	default:
+		err = -EINVAL;
+	}
+	return err;
+}
+		
+static void wm8737_sync_trigger_start_work(struct work_struct *work)
+{
+	struct wm8737_sync_data *sync_data = container_of(work, struct wm8737_sync_data, trigger_start_work);
+
+	if(gpio_is_valid(sync_data->mclk_en_gpio)) {
+		gpio_set_value(sync_data->mclk_en_gpio,1);
+	}
+}
+
+static void wm8737_sync_trigger_stop_work(struct work_struct *work)
+{
+	struct wm8737_sync_data *sync_data = container_of(work, struct wm8737_sync_data, trigger_stop_work);
+
+	if(gpio_is_valid(sync_data->cnt_rst_gpio)) {
+		gpio_set_value(sync_data->cnt_rst_gpio,1);
+	}
+
+	if(gpio_is_valid(sync_data->mclk_en_gpio)) {
+		gpio_set_value(sync_data->mclk_en_gpio,0);
+	}
+}
+
+static struct snd_soc_ops wm8737_sync_master_ops = {
+	.hw_params = wm8737_sync_hw_params,
+	.prepare = wm8737_master_sync_prepare,
+	.trigger = wm8737_master_sync_trigger,
 };
 
-static struct platform_device *wm8737_omap_snd_device;
+static struct snd_soc_ops wm8737_sync_slave_ops = {
+	.hw_params = wm8737_sync_hw_params,
+};
 
-static int __init wm8737_omap_soc_init(void)
+
+static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
+		struct wm8737_omap_data *wm8737_omap, struct wm8737_sync_data *sync_data, int is_master)
 {
 	int ret;
 
-	printk(KERN_INFO "wm8737_omap SoC init\n");
+	if(wm8737_omap->wm8737_id > MAX_WM8737_ID) {
+		printk(KERN_ERR "Invalid WM8737 ID %d\n",wm8737_omap->wm8737_id);
+		return -EINVAL;		
+	}
+	
+	if(wm8737_omap->mcbsp_id >= NUM_LINKS) {
+		printk(KERN_ERR "Invalid McBSP number %d\n",wm8737_omap->mcbsp_id);
+		return -EINVAL;
+	}
+	
+	wm8737_soc->sync_data = sync_data;
+	
+	if((wm8737_omap->cpu_dai_audio_fmt & ~7) || (wm8737_omap->codec_dai_audio_fmt & ~7)) {
+		printk(KERN_ERR "Too extensive wm8737 daifmt\n");
+		return -EINVAL;
+	}
 
-	wm8737_omap_snd_device = platform_device_alloc("soc-audio", -1);
-	if (!wm8737_omap_snd_device) {
+	wm8737_soc->cpu_daifmt = wm8737_omap->cpu_dai_audio_fmt | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBM_CFM;
+
+	wm8737_soc->codec_daifmt = wm8737_omap->codec_dai_audio_fmt | SND_SOC_DAIFMT_NB_NF;
+	wm8737_soc->codec_daifmt |= is_master ? SND_SOC_DAIFMT_CBM_CFM : SND_SOC_DAIFMT_CBS_CFS;
+	
+	wm8737_soc->snd_device = platform_device_alloc("soc-audio", wm8737_omap->wm8737_id);
+	if (!wm8737_soc->snd_device) {
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;
 	}
+	
+	//TODO pick better names
+	
+	wm8737_soc->dai.name = "wm8737";
+	wm8737_soc->dai.stream_name = "wm8737";
+	/* cpu_dai does not have to point to the matching McBSP number but it seems like the easiest
+	 * way to do it
+	 */
+	wm8737_soc->dai.cpu_dai = &omap_mcbsp_dai[wm8737_omap->mcbsp_id];
+	wm8737_soc->dai.codec_dai = &wm8737_dai;
+	wm8737_soc->dai.ops = is_master ? &wm8737_sync_master_ops : &wm8737_sync_slave_ops;
+	
+	wm8737_soc->sound_soc.name = is_master ? "wm8737-sync-master" : "wm8737-sync-slave";
+	wm8737_soc->sound_soc.platform = &omap_soc_platform;
+	wm8737_soc->sound_soc.dai_link = &wm8737_soc->dai;
+	wm8737_soc->sound_soc.num_links = 1;
+	
+	wm8737_soc->wm8737_setup.id = wm8737_omap->wm8737_id;
+	
+	wm8737_soc->snd_devdata.card = &wm8737_soc->sound_soc;
+	wm8737_soc->snd_devdata.codec_dev = &soc_codec_dev_wm8737;
+	wm8737_soc->snd_devdata.codec_data = &wm8737_soc->wm8737_setup;
+	
+	platform_set_drvdata(wm8737_soc->snd_device, &wm8737_soc->snd_devdata);
+	wm8737_soc->snd_devdata.dev = &wm8737_soc->snd_device->dev;
+	*(unsigned int *)wm8737_soc->dai.cpu_dai->private_data =  wm8737_omap->mcbsp_id;
 
-	platform_set_drvdata(wm8737_omap_snd_device, &wm8737_omap_snd_devdata);
-	wm8737_omap_snd_devdata.dev = &wm8737_omap_snd_device->dev;
-	*(unsigned int *)wm8737_omap_dai[0].cpu_dai->private_data = 0; /* McBSP1 */
-	*(unsigned int *)wm8737_omap_dai[1].cpu_dai->private_data = 1; /* McBSP2 */
-	*(unsigned int *)wm8737_omap_dai[2].cpu_dai->private_data = 2; /* McBSP3 */
-
-	ret = platform_device_add(wm8737_omap_snd_device);
+	ret = platform_device_add(wm8737_soc->snd_device);
 	if (ret)
 		goto err1;
-
-	BUG_ON(gpio_request(Wm8737_omap_HEADSET_MUX_GPIO, "hs_mux") < 0);
-	gpio_direction_output(Wm8737_omap_HEADSET_MUX_GPIO, 0);
-
-	BUG_ON(gpio_request(Wm8737_omap_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
-	gpio_direction_output(Wm8737_omap_HEADSET_EXTMUTE_GPIO, 0);
 
 	return 0;
 
 err1:
 	printk(KERN_ERR "Unable to add platform device\n");
-	platform_device_put(wm8737_omap_snd_device);
+	platform_device_put(wm8737_soc->snd_device);
 
 	return ret;
 }
-module_init(wm8737_omap_soc_init);
 
-static void __exit wm8737_omap_soc_exit(void)
+static void wm8737_omap_soc_unregister(struct wm8737_sync_soc *wm8737_soc)
 {
-	gpio_free();
-	gpio_free();
-
-	platform_device_unregister(wm8737_sync_snd_device);
+	platform_device_unregister(wm8737_soc->snd_device);
 }
-module_exit(wm8737_sync_soc_exit);
 
-/*TODO consider if wm8737 omap specific stuff and sync-specific stuff can be broken into 2 modules */
+static int __devinit wm8737_sync_probe(struct platform_device *pdev) {
+	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
+	struct wm8737_sync_data	*sync_data;
+	int i, ret = 0;
+	
+	if(!pdata)
+		return -EBUSY;
 
-struct wm8737_sync_soc {
-	struct snd_soc_card sound_soc_wm8737;
-	struct snd_soc_device wm8737_snd_devdata;
-	struct wm8737_setup_data wm8737_setup;
-	struct platform_device *wm8737_snd_device;
-	struct snd_soc_dai_link wm8737_dai;
-};
+	sync_data = kzalloc(sizeof(struct wm8737_sync_data),GFP_KERNEL);
+	if(!sync_data)
+		return -ENOMEM;
 
-struct wm8737_sync_data {
-	int cntr_rst_gpio;
-	int mclk_gate_gpio;
-	int audio_mclk;
-	struct wm8737_sync_card master;
-	struct wm8737_sync_card slave[MAX_WM8737_SLAVES];
-	int num_slaves;
-};
+	sync_data->cnt_rst_gpio = pdata->sample_cnt_rst_gpio;
+	sync_data->mclk_en_gpio = pdata->mclk_en_gpio;
+	INIT_WORK(&sync_data->trigger_start_work,	wm8737_sync_trigger_start_work);
+	INIT_WORK(&sync_data->trigger_stop_work,	wm8737_sync_trigger_stop_work);
+			
+	if(gpio_is_valid(sync_data->cnt_rst_gpio)){
+		if(gpio_request(sync_data->cnt_rst_gpio, "sample_cnt_rst") < 0) {
+			ret = -EINVAL;
+			goto free_mem;
+		}
+		gpio_direction_output(sync_data->cnt_rst_gpio, 1);
+	}
 
-static struct platform_driver gpio_led_driver = {
+	if(gpio_is_valid(sync_data->mclk_en_gpio)){
+		if(gpio_request(sync_data->mclk_en_gpio, "mclk_en") < 0) {
+			ret = -EINVAL;
+			goto free_cnt_gpio;
+		}
+
+		gpio_direction_output(sync_data->mclk_en_gpio, 0);
+	}
+	
+	ret = wm8737_omap_soc_register(&sync_data->master,pdata->master, sync_data, 1);
+	if(ret)
+		goto free_mclk_en_gpio;
+		
+	for(i = 0; i < pdata->num_slaves; i++) {
+		ret = wm8737_omap_soc_register(&sync_data->slaves[i],&pdata->slaves[i], sync_data, 0);
+		if(ret)
+			goto free_slaves;
+	}
+
+	platform_set_drvdata(pdev, sync_data);
+	return ret;
+	
+free_slaves:
+	for(i = i-1; i >= 0; i--) {
+		wm8737_omap_soc_unregister(&sync_data->slaves[i]);
+	}
+
+	wm8737_omap_soc_unregister(&sync_data->master);
+	
+free_mclk_en_gpio:
+	gpio_free(sync_data->mclk_en_gpio);
+
+free_cnt_gpio:
+	gpio_free(sync_data->cnt_rst_gpio);
+
+free_mem:
+	kfree(sync_data);
+	
+	return ret;
+}
+
+static int __devexit wm8737_sync_remove(struct platform_device *pdev)
+{
+	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
+	struct wm8737_sync_data	*sync_data;
+	int i;
+	
+	sync_data = platform_get_drvdata(pdev);
+
+	for(i = pdata->num_slaves - 1; i >= 0; i--) {
+		wm8737_omap_soc_unregister(&sync_data->slaves[i]);
+	}
+
+	wm8737_omap_soc_unregister(&sync_data->master);
+	
+	if(gpio_is_valid(sync_data->mclk_en_gpio))
+		gpio_free(sync_data->mclk_en_gpio);
+
+	if(gpio_is_valid(sync_data->cnt_rst_gpio))
+		gpio_free(sync_data->cnt_rst_gpio);
+	
+	kfree(sync_data);
+	
+	return 0;
+}
+
+static struct platform_driver wm8737_sync_driver = {
 	.probe		= wm8737_sync_probe,
 	.remove		= __devexit_p(wm8737_sync_remove),
 	.driver		= {
@@ -265,55 +357,22 @@ static struct platform_driver gpio_led_driver = {
 	},
 };
 
-static int __devinit wm8737_sync_probe(struct platform_device *pdev) {
-	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
-	struct wm8737_sync_data	*sync_data;
-	int ret = 0;
-
-	if(!pdata)
-		return -EBUSY;
-
-	sync_data = kzalloc(sizeof(wm8737_sync_data),GFP_KERNEL);
-	if(!sync_data)
-		return -ENOMEM;
-
-	if(pdata->sample_cnt_rst_gpio >= 0){
-		if(gpio_request(pdata->sample_cnt_rst_gpio, "sample_cnt_rst") < 0) {
-			ret = -EINVAL;
-			goto free_mem;
-		}
-		gpio_direction_output(pdata->sample_cnt_rst_gpio, 1);
-	}
-
-	if(pdata->mclk_en_gpio >= 0){
-		if(gpio_request(pdata->mclk_en_gpio, "mclk_en") < 0) {
-			ret = -EINVAL;
-			goto free_cnt_gpio;
-		}
-
-		gpio_direction_output(pdata->mclk_en_gpio, 0);
-	}
-
-	/*do stuff*/
-
-	platform_set_drvdata(pdev, sync_data);
-	return ret;
-
-free_cnt_gpio:
-
-free_mem:
-	kfree(sync_data);
-}
-
-static int __devexit wm8737_sync_remove(struct platform_device *pdev)
+static int __init wm8737_sync_init(void)
 {
-	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
-	struct wm8737_sync_data	*sync_data;
+	int ret;
 
-	sync_data = platform_get_drvdata(pdev);
-	/* Do stuff */
-	kfree(sync_data);
+	ret = platform_driver_register(&wm8737_sync_driver);
+
+	return ret;
 }
+
+static void __exit wm8737_sync_exit(void)
+{
+	platform_driver_unregister(&wm8737_sync_driver);
+}
+module_init(wm8737_sync_init);
+module_exit(wm8737_sync_exit);
+
 
 MODULE_AUTHOR("Sarah Newman <snewman@shotspotter.com>");
 MODULE_DESCRIPTION("ALSA SoC wm8737-sync");

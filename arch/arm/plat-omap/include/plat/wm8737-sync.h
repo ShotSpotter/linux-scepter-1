@@ -28,19 +28,19 @@
 #define MAX_WM8737_SLAVES 3
 
 struct wm8737_omap_data {
-	int id;
-	unsigned int mcbsp;
-	unsigned int codec_daifmt;
-	unsigned int cpu_daifmt;
+	unsigned int wm8737_id;
+	unsigned int mcbsp_id;
+	unsigned int codec_dai_audio_fmt;
+	unsigned int cpu_dai_audio_fmt;
 };
 
 struct wm8737_sync_platform_data {
 	int sample_cnt_rst_gpio;
 	int mclk_en_gpio;
-	int audio_mclk;
+	unsigned int mclk;
 	struct wm8737_omap_data *master;
 	struct wm8737_omap_data *slaves;
-	int num_slaves;
+	unsigned int num_slaves;
 };
 
 #endif

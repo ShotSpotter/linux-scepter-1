@@ -121,3 +121,15 @@ config SND_OMAP_SOC_IGEP0020
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for Soc audio on IGEP v2 board.
+
+
+config SND_OMAP_SOC_WM8737_SYNC
+	tristate "SoC Audio support for synchronized WM8737s"
+	depends on SND_OMAP_SOC  && (I2C || SPI_MASTER)
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_WM8737
+	help
+	  Say Y if you want to add support for synchronized WM8737's, where one
+	  WM8737 is master and all other interfaces are slaves.
+	  Optional support for tighter synchronization by enabling mclk with a GPIO 
+	  is provided. An optional GPIO reset for an external sample counter is also provided.

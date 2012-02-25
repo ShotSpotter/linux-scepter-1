@@ -41,7 +41,7 @@
 #include "omap-pcm.h"
 #include "../codecs/wm8737.h"
 
-static int scepter_hw_params(struct snd_pcm_substream *substream,
+static int wm8737_omap_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -80,55 +80,12 @@ static int scepter_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static struct snd_soc_ops scepter_ops = {
-	.hw_params = scepter_hw_params,
+static struct snd_soc_ops wm8737_omap_ops = {
+	.hw_params = wm8737_omap_hw_params,
 };
 
-static int scepter_hw_voice_params(struct snd_pcm_substream *substream,
-				struct snd_pcm_hw_params *params)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
-	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
-	int ret;
-
-	/* Set codec DAI configuration */
-	ret = snd_soc_dai_set_fmt(codec_dai,
-				SND_SOC_DAIFMT_DSP_A |
-				SND_SOC_DAIFMT_IB_NF |
-				SND_SOC_DAIFMT_CBM_CFM);
-	if (ret) {
-		printk(KERN_ERR "can't set codec DAI configuration\n");
-		return ret;
-	}
-
-	/* Set cpu DAI configuration */
-	ret = snd_soc_dai_set_fmt(cpu_dai,
-				SND_SOC_DAIFMT_DSP_A |
-				SND_SOC_DAIFMT_IB_NF |
-				SND_SOC_DAIFMT_CBM_CFM);
-	if (ret < 0) {
-		printk(KERN_ERR "can't set cpu DAI configuration\n");
-		return ret;
-	}
-
-	/* Set the codec system clock for DAC and ADC */
-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 26000000,
-					SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		printk(KERN_ERR "can't set codec system clock\n");
-		return ret;
-	}
-
-	return 0;
-}
-
-static struct snd_soc_ops scepter_voice_ops = {
-	.hw_params = scepter_hw_voice_params,
-};
-
-/* Scepter machine DAPM */
-static const struct snd_soc_dapm_widget scepter_twl4030_dapm_widgets[] = {
+/* Wm8737_omap machine DAPM */
+static const struct snd_soc_dapm_widget wm8737_omap_twl4030_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Ext Mic", NULL),
 	SND_SOC_DAPM_SPK("Ext Spk", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
@@ -160,20 +117,20 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Aux In", NULL, "AUXR"},
 };
 
-static int scepter_twl4030_init(struct snd_soc_codec *codec)
+static int wm8737_omap_twl4030_init(struct snd_soc_codec *codec)
 {
 	int ret;
 
-	/* Add Scepter specific widgets */
-	ret = snd_soc_dapm_new_controls(codec, scepter_twl4030_dapm_widgets,
-				ARRAY_SIZE(scepter_twl4030_dapm_widgets));
+	/* Add Wm8737_omap specific widgets */
+	ret = snd_soc_dapm_new_controls(codec, wm8737_omap_twl4030_dapm_widgets,
+				ARRAY_SIZE(wm8737_omap_twl4030_dapm_widgets));
 	if (ret)
 		return ret;
 
-	/* Set up Scepter specific audio path audio_map */
+	/* Set up Wm8737_omap specific audio path audio_map */
 	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
 
-	/* Scepter connected pins */
+	/* Wm8737_omap connected pins */
 	snd_soc_dapm_enable_pin(codec, "Ext Mic");
 	snd_soc_dapm_enable_pin(codec, "Ext Spk");
 	snd_soc_dapm_enable_pin(codec, "Headset Mic");
@@ -193,126 +150,172 @@ static int scepter_twl4030_init(struct snd_soc_codec *codec)
 	snd_soc_dapm_nc_pin(codec, "CARKITL");
 	snd_soc_dapm_nc_pin(codec, "CARKITR");
 
-	ret = snd_soc_dapm_sync(codec);
+	ret = snd_soc_dapm_omap(codec);
 
 	return ret;
 }
 
-static int scepter_twl4030_voice_init(struct snd_soc_codec *codec)
-{
-	unsigned short reg;
-
-	/* Enable voice interface */
-	reg = codec->read(codec, TWL4030_REG_VOICE_IF);
-	reg |= TWL4030_VIF_DIN_EN | TWL4030_VIF_DOUT_EN | TWL4030_VIF_EN;
-	codec->write(codec, TWL4030_REG_VOICE_IF, reg);
-
-	return 0;
-}
-
 /* Digital audio interface glue - connects codec <--> CPU */
-static struct snd_soc_dai_link scepter_dai[] = {
+static struct snd_soc_dai_link wm8737_omap_dai[] = {
 	{
 		.name = "TWL4030 I2S",
 		.stream_name = "TWL4030 Audio",
 		.cpu_dai = &omap_mcbsp_dai[0],
 		.codec_dai = &twl4030_dai[TWL4030_DAI_HIFI],
-		.init = scepter_twl4030_init,
-		.ops = &scepter_ops,
-	},
-	{
-		.name = "TWL4030 PCM",
-		.stream_name = "TWL4030 Voice",
-		.cpu_dai = &omap_mcbsp_dai[1],
-		.codec_dai = &twl4030_dai[TWL4030_DAI_VOICE],
-		.init = scepter_twl4030_voice_init,
-		.ops = &scepter_voice_ops,
-	},
+		.init = wm8737_omap_twl4030_init,
+		.ops = &wm8737_omap_ops,
+	}
 };
 
 /* Audio machine driver */
-static struct snd_soc_card snd_soc_scepter = {
-	.name = "Scepter",
+static struct snd_soc_card snd_soc_wm8737_omap = {
+	.name = "Wm8737_omap",
 	.platform = &omap_soc_platform,
-	.dai_link = scepter_dai,
-	.num_links = ARRAY_SIZE(scepter_dai),
+	.dai_link = wm8737_omap_dai,
+	.num_links = ARRAY_SIZE(wm8737_omap_dai),
 };
 
 /* EXTMUTE callback function */
-void scepter_set_hs_extmute(int mute)
+void wm8737_omap_set_hs_extmute(int mute)
 {
-	gpio_set_value(Scepter_HEADSET_EXTMUTE_GPIO, mute);
+	gpio_set_value(Wm8737_omap_HEADSET_EXTMUTE_GPIO, mute);
 }
 
-/* twl4030 setup */
-static struct twl4030_setup_data twl4030_setup = {
-	.ramp_delay_value = 3,	/* 161 ms */
-	.sysclk = 26000,
-	.hs_extmute = 1,
-	.set_hs_extmute = scepter_set_hs_extmute,
-};
-
 /* Audio subsystem */
-static struct snd_soc_device scepter_snd_devdata = {
-	.card = &snd_soc_scepter,
+static struct snd_soc_device wm8737_omap_snd_devdata = {
+	.card = &snd_soc_wm8737_omap,
 	.codec_dev = &soc_codec_dev_twl4030,
 	.codec_data = &twl4030_setup,
 };
 
-static struct platform_device *scepter_snd_device;
+static struct platform_device *wm8737_omap_snd_device;
 
-static int __init scepter_soc_init(void)
+static int __init wm8737_omap_soc_init(void)
 {
 	int ret;
 
-	if (!machine_is_omap_scepter()) {
-		pr_debug("Not Scepter!\n");
-		return -ENODEV;
-	}
-	printk(KERN_INFO "Scepter SoC init\n");
+	printk(KERN_INFO "wm8737_omap SoC init\n");
 
-	scepter_snd_device = platform_device_alloc("soc-audio", -1);
-	if (!scepter_snd_device) {
+	wm8737_omap_snd_device = platform_device_alloc("soc-audio", -1);
+	if (!wm8737_omap_snd_device) {
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;
 	}
 
-	platform_set_drvdata(scepter_snd_device, &scepter_snd_devdata);
-	scepter_snd_devdata.dev = &scepter_snd_device->dev;
-	*(unsigned int *)scepter_dai[0].cpu_dai->private_data = 0; /* McBSP1 */
-	*(unsigned int *)scepter_dai[1].cpu_dai->private_data = 1; /* McBSP2 */
-	*(unsigned int *)scepter_dai[2].cpu_dai->private_data = 2; /* McBSP3 */
+	platform_set_drvdata(wm8737_omap_snd_device, &wm8737_omap_snd_devdata);
+	wm8737_omap_snd_devdata.dev = &wm8737_omap_snd_device->dev;
+	*(unsigned int *)wm8737_omap_dai[0].cpu_dai->private_data = 0; /* McBSP1 */
+	*(unsigned int *)wm8737_omap_dai[1].cpu_dai->private_data = 1; /* McBSP2 */
+	*(unsigned int *)wm8737_omap_dai[2].cpu_dai->private_data = 2; /* McBSP3 */
 
-	ret = platform_device_add(scepter_snd_device);
+	ret = platform_device_add(wm8737_omap_snd_device);
 	if (ret)
 		goto err1;
 
-	BUG_ON(gpio_request(Scepter_HEADSET_MUX_GPIO, "hs_mux") < 0);
-	gpio_direction_output(Scepter_HEADSET_MUX_GPIO, 0);
+	BUG_ON(gpio_request(Wm8737_omap_HEADSET_MUX_GPIO, "hs_mux") < 0);
+	gpio_direction_output(Wm8737_omap_HEADSET_MUX_GPIO, 0);
 
-	BUG_ON(gpio_request(Scepter_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
-	gpio_direction_output(Scepter_HEADSET_EXTMUTE_GPIO, 0);
+	BUG_ON(gpio_request(Wm8737_omap_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
+	gpio_direction_output(Wm8737_omap_HEADSET_EXTMUTE_GPIO, 0);
 
 	return 0;
 
 err1:
 	printk(KERN_ERR "Unable to add platform device\n");
-	platform_device_put(scepter_snd_device);
+	platform_device_put(wm8737_omap_snd_device);
 
 	return ret;
 }
-module_init(scepter_soc_init);
+module_init(wm8737_omap_soc_init);
 
-static void __exit scepter_soc_exit(void)
+static void __exit wm8737_omap_soc_exit(void)
 {
 	gpio_free();
 	gpio_free();
 
-	platform_device_unregister(scepter_snd_device);
+	platform_device_unregister(wm8737_sync_snd_device);
 }
-module_exit(scepter_soc_exit);
+module_exit(wm8737_sync_soc_exit);
+
+/*TODO consider if wm8737 omap specific stuff and sync-specific stuff can be broken into 2 modules */
+
+struct wm8737_sync_soc {
+	struct snd_soc_card sound_soc_wm8737;
+	struct snd_soc_device wm8737_snd_devdata;
+	struct wm8737_setup_data wm8737_setup;
+	struct platform_device *wm8737_snd_device;
+	struct snd_soc_dai_link wm8737_dai;
+};
+
+struct wm8737_sync_data {
+	int cntr_rst_gpio;
+	int mclk_gate_gpio;
+	int audio_mclk;
+	struct wm8737_sync_card master;
+	struct wm8737_sync_card slave[MAX_WM8737_SLAVES];
+	int num_slaves;
+};
+
+static struct platform_driver gpio_led_driver = {
+	.probe		= wm8737_sync_probe,
+	.remove		= __devexit_p(wm8737_sync_remove),
+	.driver		= {
+		.name	= "wm8737-sync",
+		.owner	= THIS_MODULE,
+	},
+};
+
+static int __devinit wm8737_sync_probe(struct platform_device *pdev) {
+	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
+	struct wm8737_sync_data	*sync_data;
+	int ret = 0;
+
+	if(!pdata)
+		return -EBUSY;
+
+	sync_data = kzalloc(sizeof(wm8737_sync_data),GFP_KERNEL);
+	if(!sync_data)
+		return -ENOMEM;
+
+	if(pdata->sample_cnt_rst_gpio >= 0){
+		if(gpio_request(pdata->sample_cnt_rst_gpio, "sample_cnt_rst") < 0) {
+			ret = -EINVAL;
+			goto free_mem;
+		}
+		gpio_direction_output(pdata->sample_cnt_rst_gpio, 1);
+	}
+
+	if(pdata->mclk_en_gpio >= 0){
+		if(gpio_request(pdata->mclk_en_gpio, "mclk_en") < 0) {
+			ret = -EINVAL;
+			goto free_cnt_gpio;
+		}
+
+		gpio_direction_output(pdata->mclk_en_gpio, 0);
+	}
+
+	/*do stuff*/
+
+	platform_set_drvdata(pdev, sync_data);
+	return ret;
+
+free_cnt_gpio:
+
+free_mem:
+	kfree(sync_data);
+}
+
+static int __devexit wm8737_sync_remove(struct platform_device *pdev)
+{
+	struct wm8737_sync_platform_data *pdata = pdev->dev.platform_data;
+	struct wm8737_sync_data	*sync_data;
+
+	sync_data = platform_get_drvdata(pdev);
+	/* Do stuff */
+	kfree(sync_data);
+}
 
 MODULE_AUTHOR("Sarah Newman <snewman@shotspotter.com>");
-MODULE_DESCRIPTION("ALSA SoC Scepter");
+MODULE_DESCRIPTION("ALSA SoC wm8737-sync");
 MODULE_LICENSE("GPL");
 

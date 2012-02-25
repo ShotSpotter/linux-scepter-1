@@ -34,6 +34,7 @@
 #include <sound/wm8737.h>
 #include "wm8737.h"
 
+
 static struct snd_soc_codec *wm8737_codec[MAX_WM8737_CNT];
 
 struct snd_soc_codec_device soc_codec_dev_wm8737;
@@ -570,7 +571,7 @@ struct snd_soc_dai wm8737_dai = {
 	.name = "wm8737",
 	.capture = {
 		.stream_name = "Capture",
-		.channels_min = 2,  /* Mono modes not yet supported */
+		.channels_min = 1,  /* Only gets us left channel and not mono as defined in the datasheet */
 		.channels_max = 2,
 		.rates = WM8737_RATES,
 		.formats = WM8737_FORMATS,

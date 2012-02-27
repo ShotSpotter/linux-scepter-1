@@ -106,7 +106,7 @@ static int wm8737_sync_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int wm8737_master_sync_prepare(struct snd_pcm_substream *substream) {
+static int wm8737_sync_prepare(struct snd_pcm_substream *substream) {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct wm8737_sync_soc *wm8737_soc = container_of(rtd->dai,struct wm8737_sync_soc,dai);
@@ -171,12 +171,13 @@ static void wm8737_sync_trigger_stop_work(struct work_struct *work)
 
 static struct snd_soc_ops wm8737_sync_master_ops = {
 	.hw_params = wm8737_sync_hw_params,
-	.prepare = wm8737_master_sync_prepare,
+	.prepare = wm8737_sync_prepare,
 	.trigger = wm8737_master_sync_trigger,
 };
 
 static struct snd_soc_ops wm8737_sync_slave_ops = {
 	.hw_params = wm8737_sync_hw_params,
+	.prepare = wm8737_sync_prepare,
 };
 
 

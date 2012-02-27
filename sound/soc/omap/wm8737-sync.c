@@ -214,14 +214,15 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 		return -ENOMEM;
 	}
 	
-
+	//TODO pick better names
+	
 	wm8737_soc->dai.name = "wm8737";
 	wm8737_soc->dai.stream_name = "wm8737";
 	/* cpu_dai does not have to point to the matching McBSP number but it seems like the easiest
 	 * way to do it
 	 */
 	wm8737_soc->dai.cpu_dai = &omap_mcbsp_dai[wm8737_omap->mcbsp_id];
-	wm8737_soc->dai.codec_dai = &wm8737_dai[wm8737_omap->wm8737_id];
+	wm8737_soc->dai.codec_dai = &wm8737_dai;
 	wm8737_soc->dai.ops = is_master ? &wm8737_sync_master_ops : &wm8737_sync_slave_ops;
 	
 	wm8737_soc->sound_soc.name = is_master ? "wm8737-sync-master" : "wm8737-sync-slave";

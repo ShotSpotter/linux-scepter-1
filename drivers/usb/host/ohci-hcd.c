@@ -1031,8 +1031,8 @@ MODULE_LICENSE ("GPL");
 #endif
 
 #ifdef CONFIG_ARCH_OMAP
-#include "ohci-omap.c"
-#define PLATFORM_DRIVER		ohci_hcd_omap_driver
+#include "ohci-omap3.c"
+#define PLATFORM_DRIVER		ohci_hcd_omap3_driver
 #endif
 
 #ifdef CONFIG_ARCH_LH7A404

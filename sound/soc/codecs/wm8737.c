@@ -780,14 +780,14 @@ static int __devinit wm8737_spi_probe(struct spi_device *spi)
 		return -EINVAL;
 	}
 
+	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
+	if (wm8737 == NULL)
+		return -ENOMEM;
+
 	if(pdata && pdata->id >= 0)
 		wm8737->id = pdata->id;
 	else
 		wm8737->id = 0;
-
-	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
-	if (wm8737 == NULL)
-		return -ENOMEM;
 
 	codec = &wm8737->codec;
 	codec->control_data = spi;
@@ -831,14 +831,14 @@ static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
 		return -EINVAL;
 	}
 
+	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
+	if (wm8737 == NULL)
+		return -ENOMEM;
+
 	if(pdata && pdata->id >= 0)
 		wm8737->id = pdata->id;
 	else
 		wm8737->id = 0;
-
-	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
-	if (wm8737 == NULL)
-		return -ENOMEM;
 
 	codec = &wm8737->codec;
 

@@ -30,7 +30,6 @@
 
 struct snd_soc_dai generic_slave_dai = {
 	.name = "Generic slave",
-	.id = 1,
 	.capture = {
 		.stream_name = "Capture",
 		.channels_min = 1,
@@ -101,7 +100,7 @@ static int __devexit generic_slave_platform_remove(struct platform_device *pdev)
 
 static struct platform_driver generic_slave_codec_driver = {
 	.driver = {
-			.name = "generic_slave",
+			.name = "slave ASoC codec",
 			.owner = THIS_MODULE,
 	},
 
@@ -121,6 +120,6 @@ static void __exit generic_slave_exit(void)
 }
 module_exit(generic_slave_exit);
 
-MODULE_DESCRIPTION("ASoC generic_slave driver");
+MODULE_DESCRIPTION("ASoC generic slave codec driver");
 MODULE_AUTHOR("Sarah Newman");
 MODULE_LICENSE("GPL");

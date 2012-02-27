@@ -96,7 +96,7 @@ static int __init scepter_pps_soc_init(void)
 	int ret;
 
 
-	scepter_pps_snd_device = platform_device_alloc("soc-audio", -1);
+	scepter_pps_snd_device = platform_device_alloc("soc-audio", 2);
 	if (!scepter_pps_snd_device) {
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;

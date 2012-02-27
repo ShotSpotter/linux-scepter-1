@@ -567,17 +567,8 @@ static struct snd_soc_dai_ops wm8737_dai_ops = {
 	.set_fmt	= wm8737_set_dai_fmt,
 };
 
-struct snd_soc_dai wm8737_dai = {
-	.name = "wm8737",
-	.capture = {
-		.stream_name = "Capture",
-		.channels_min = 1,  /* Only gets us left channel and not mono as defined in the datasheet */
-		.channels_max = 2,
-		.rates = WM8737_RATES,
-		.formats = WM8737_FORMATS,
-	},
-	.ops = &wm8737_dai_ops,
-};
+struct snd_soc_dai wm8737_dai[MAX_WM8737_CNT];
+
 EXPORT_SYMBOL_GPL(wm8737_dai);
 
 #ifdef CONFIG_PM
@@ -687,7 +678,7 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 	codec->owner = THIS_MODULE;
 	codec->bias_level = SND_SOC_BIAS_OFF;
 	codec->set_bias_level = wm8737_set_bias_level;
-	codec->dai = &wm8737_dai;
+	codec->dai = &wm8737_dai[id];
 	codec->num_dai = 1;
 	codec->reg_cache_size = WM8737_REGISTER_COUNT;
 	codec->reg_cache = &wm8737->reg_cache;
@@ -723,7 +714,7 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 		goto err_regulator_enable;
 	}
 
-	wm8737_dai.dev = codec->dev;
+	wm8737_dai[id].dev = codec->dev;
 
 	wm8737_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
@@ -735,7 +726,7 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 		goto err_regulator_enable;
 	}
 
-	ret = snd_soc_register_dai(&wm8737_dai);
+	ret = snd_soc_register_dai(&wm8737_dai[id]);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to register DAI: %d\n", ret);
 		snd_soc_unregister_codec(codec);
@@ -759,7 +750,7 @@ err:
 static void wm8737_unregister(struct wm8737_priv *wm8737)
 {
 	wm8737_set_bias_level(&wm8737->codec, SND_SOC_BIAS_OFF);
-	snd_soc_unregister_dai(&wm8737_dai);
+	snd_soc_unregister_dai(&wm8737_dai[wm8737->id]);
 	snd_soc_unregister_codec(&wm8737->codec);
 	regulator_bulk_disable(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
 	regulator_bulk_free(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
@@ -876,7 +867,17 @@ static struct i2c_driver wm8737_i2c_driver = {
 
 static int __init wm8737_modinit(void)
 {
-	int ret;
+	int ret,i;
+
+	for(i = 0; i < MAX_WM8737_CNT; i++) {
+		wm8737_dai[i].name = "wm8737";
+		wm8737_dai[i].capture.stream_name = "Capture";
+		wm8737_dai[i].capture.channels_min = 1;  /* Only gets us left channel and not mono as defined in the datasheet */
+		wm8737_dai[i].capture.channels_max = 2;
+		wm8737_dai[i].capture.rates = WM8737_RATES;
+		wm8737_dai[i].capture.formats = WM8737_FORMATS;
+		wm8737_dai[i].ops = &wm8737_dai_ops;
+	}
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	ret = i2c_add_driver(&wm8737_i2c_driver);
 	if (ret != 0) {

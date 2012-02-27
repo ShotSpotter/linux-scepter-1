@@ -21,6 +21,7 @@ snd-soc-omap3beagle-objs := omap3beagle.o
 snd-soc-zoom2-objs := zoom2.o
 snd-soc-igep0020-objs := igep0020.o
 snd-soc-wm8737-sync-objs := wm8737-sync.o
+snd-soc-scepter-pps-objs := scepter-pps.o
 
 obj-$(CONFIG_SND_OMAP_SOC_N810) += snd-soc-n810.o
 obj-$(CONFIG_SND_OMAP_SOC_AMS_DELTA) += snd-soc-ams-delta.o
@@ -35,3 +36,4 @@ obj-$(CONFIG_SND_OMAP_SOC_OMAP3_BEAGLE) += snd-soc-omap3beagle.o
 obj-$(CONFIG_SND_OMAP_SOC_ZOOM2) += snd-soc-zoom2.o
 obj-$(CONFIG_SND_OMAP_SOC_IGEP0020) += snd-soc-igep0020.o
 obj-$(CONFIG_SND_OMAP_SOC_WM8737_SYNC) += snd-soc-wm8737-sync.o
+obj-$(CONFIG_SND_OMAP_SOC_SCEPTER_PPS) += snd-soc-scepter-pps.o

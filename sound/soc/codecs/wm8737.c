@@ -36,6 +36,7 @@
 
 
 static struct snd_soc_codec *wm8737_codec[MAX_WM8737_CNT];
+int registered_once;
 
 struct snd_soc_codec_device soc_codec_dev_wm8737;
 
@@ -735,6 +736,9 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 		goto err_regulator_enable;
 	}
 
+	if(registered_once)
+		return 0;
+
 	ret = snd_soc_register_dai(&wm8737_dai);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to register DAI: %d\n", ret);
@@ -742,6 +746,7 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 		goto err_codec;
 	}
 
+	registered_once = 1;
 
 	return 0;
 

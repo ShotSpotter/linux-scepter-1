@@ -100,7 +100,7 @@ static int __devexit generic_slave_platform_remove(struct platform_device *pdev)
 
 static struct platform_driver generic_slave_codec_driver = {
 	.driver = {
-			.name = "slave ASoC codec",
+			.name = "asoc-slave-codec",
 			.owner = THIS_MODULE,
 	},
 

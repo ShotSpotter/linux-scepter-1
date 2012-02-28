@@ -286,6 +286,8 @@ static int __devinit wm8737_sync_probe(struct platform_device *pdev) {
 
 	sync_data->cnt_rst_gpio = pdata->sample_cnt_rst_gpio;
 	sync_data->mclk_en_gpio = pdata->mclk_en_gpio;
+	sync_data->mclk = pdata->mclk;
+
 	INIT_WORK(&sync_data->trigger_start_work,	wm8737_sync_trigger_start_work);
 	INIT_WORK(&sync_data->trigger_stop_work,	wm8737_sync_trigger_stop_work);
 			

@@ -185,6 +185,7 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 		struct wm8737_omap_data *wm8737_omap, struct wm8737_sync_data *sync_data, int is_master)
 {
 	int ret;
+	char name[32];
 
 	if(wm8737_omap->wm8737_id > MAX_WM8737_ID) {
 		printk(KERN_ERR "Invalid WM8737 ID %d\n",wm8737_omap->wm8737_id);
@@ -217,6 +218,13 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 
 	wm8737_soc->dai.name = "wm8737";
 	wm8737_soc->dai.stream_name = "wm8737";
+	snprintf(name,sizeof(name),"wm8737-%d",wm8737_omap->wm8737_id);
+	name[sizeof(name)-1] = '\0';
+
+
+	wm8737_soc->dai.name = name;
+	wm8737_soc->dai.stream_name = name;
+
 	/* cpu_dai does not have to point to the matching McBSP number but it seems like the easiest
 	 * way to do it
 	 */
@@ -224,7 +232,14 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 	wm8737_soc->dai.codec_dai = &wm8737_dai[wm8737_omap->wm8737_id];
 	wm8737_soc->dai.ops = is_master ? &wm8737_sync_master_ops : &wm8737_sync_slave_ops;
 	
-	wm8737_soc->sound_soc.name = is_master ? "wm8737-sync-master" : "wm8737-sync-slave";
+	if(is_master)
+		snprintf(name,sizeof(name),"wm8737-smaster-%d",wm8737_omap->wm8737_id);
+	else
+		snprintf(name,sizeof(name),"wm8737-sslave-%d",wm8737_omap->wm8737_id);
+
+
+	name[sizeof(name)-1] = '\0';
+	wm8737_soc->sound_soc.name = name;
 	wm8737_soc->sound_soc.platform = &omap_soc_platform;
 	wm8737_soc->sound_soc.dai_link = &wm8737_soc->dai;
 	wm8737_soc->sound_soc.num_links = 1;

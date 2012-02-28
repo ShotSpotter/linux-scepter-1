@@ -77,7 +77,7 @@ static struct snd_soc_dai_link scepter_pps_dai = {
 
 /* Audio machine driver */
 static struct snd_soc_card snd_soc_scepter_pps = {
-	.name = "scepter_pps",
+	.name = "scepter-pps",
 	.platform = &omap_soc_platform,
 	.dai_link = &scepter_pps_dai,
 	.num_links = 1,

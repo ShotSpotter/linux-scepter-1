@@ -52,13 +52,6 @@ static int scepter_pps_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 12228000,
-				     SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		printk(KERN_ERR "can't set codec system clock\n");
-		return ret;
-	}
-
 	return 0;
 }
 

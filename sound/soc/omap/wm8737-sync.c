@@ -185,7 +185,9 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 		struct wm8737_omap_data *wm8737_omap, struct wm8737_sync_data *sync_data, int is_master)
 {
 	int ret;
-	char name[32];
+	const size_t NAME_SZ = 32;
+	char name[NAME_SZ];
+
 
 	if(wm8737_omap->wm8737_id > MAX_WM8737_ID) {
 		printk(KERN_ERR "Invalid WM8737 ID %d\n",wm8737_omap->wm8737_id);
@@ -216,14 +218,15 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 	}
 	
 
-	wm8737_soc->dai.name = "wm8737";
-	wm8737_soc->dai.stream_name = "wm8737";
-	snprintf(name,sizeof(name),"wm8737-%d",wm8737_omap->wm8737_id);
-	name[sizeof(name)-1] = '\0';
+	snprintf(name,NAME_SZ,"wm8737-%d",wm8737_omap->wm8737_id);
+	name[NAME_SZ-1] = '\0';
 
+	wm8737_soc->dai.name = kzalloc(NAME_SZ,GFP_KERNEL);
+	if(!wm8737_soc->dai.name)
+		return -ENOMEM;
 
-	wm8737_soc->dai.name = name;
-	wm8737_soc->dai.stream_name = name;
+	strcpy(wm8737_soc->dai.name,name);
+	wm8737_soc->dai.stream_name = wm8737_soc->dai.name;
 
 	/* cpu_dai does not have to point to the matching McBSP number but it seems like the easiest
 	 * way to do it
@@ -233,13 +236,20 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 	wm8737_soc->dai.ops = is_master ? &wm8737_sync_master_ops : &wm8737_sync_slave_ops;
 	
 	if(is_master)
-		snprintf(name,sizeof(name),"wm8737-smaster-%d",wm8737_omap->wm8737_id);
+		snprintf(name,NAME_SZ,"wm8737-smaster-%d",wm8737_omap->wm8737_id);
 	else
-		snprintf(name,sizeof(name),"wm8737-sslave-%d",wm8737_omap->wm8737_id);
+		snprintf(name,NAME_SZ,"wm8737-sslave-%d",wm8737_omap->wm8737_id);
 
 
-	name[sizeof(name)-1] = '\0';
-	wm8737_soc->sound_soc.name = name;
+	name[NAME_SZ-1] = '\0';
+	wm8737_soc->sound_soc.name = kzalloc(NAME_SZ,GFP_KERNEL);
+	if(!wm8737_soc->sound_soc.name) {
+		ret = -ENOMEM;
+		goto free_dai_name;
+	}
+
+	strcpy(wm8737_soc->sound_soc.name,name);
+
 	wm8737_soc->sound_soc.platform = &omap_soc_platform;
 	wm8737_soc->sound_soc.dai_link = &wm8737_soc->dai;
 	wm8737_soc->sound_soc.num_links = 1;
@@ -264,12 +274,18 @@ err1:
 	printk(KERN_ERR "Unable to add platform device\n");
 	platform_device_put(wm8737_soc->snd_device);
 
+	kfree(wm8737_soc->sound_soc.name);
+
+free_dai_name:
+	kfree(wm8737_soc->dai.name);
 	return ret;
 }
 
 static void wm8737_omap_soc_unregister(struct wm8737_sync_soc *wm8737_soc)
 {
 	platform_device_unregister(wm8737_soc->snd_device);
+	kfree(wm8737_soc->sound_soc.name);
+	kfree(wm8737_soc->dai.name);
 }
 
 static int __devinit wm8737_sync_probe(struct platform_device *pdev) {

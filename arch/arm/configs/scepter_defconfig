@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34.9
-# Mon Feb 20 13:39:51 2012
+# Thu Mar  1 07:23:15 2012
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -623,6 +623,7 @@ CONFIG_BLK_DEV_RAM_SIZE=16384
 # CONFIG_ATA_OVER_ETH is not set
 # CONFIG_MG_DISK is not set
 CONFIG_MISC_DEVICES=y
+CONFIG_GPT=m
 # CONFIG_AD525X_DPOT is not set
 # CONFIG_ICS932S401 is not set
 # CONFIG_ENCLOSURE_SERVICES is not set

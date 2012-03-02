@@ -156,7 +156,7 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
 		/* Writing zero to RSYNC_ERR clears the IRQ */
 		MCBSP_WRITE(mcbsp_rx, SPCR1, MCBSP_READ_CACHE(mcbsp_rx, SPCR1));
 	} else {
-		complete(&mcbsp_rx->tx_irq_completion);
+		complete(&mcbsp_rx->rx_irq_completion);
 	}
 
 	return IRQ_HANDLED;
@@ -481,9 +481,9 @@ int omap_st_is_enabled(unsigned int id)
 EXPORT_SYMBOL(omap_st_is_enabled);
 
 /*
- * omap_mcbsp_set_tx_threshold configures how to deal
- * with transmit threshold. the threshold value and handler can be
- * configure in here.
+ * omap_mcbsp_set_rx_threshold configures the transmit threshold in words.
+ * The threshold parameter is 1 based, and it is converted (threshold - 1)
+ * for the THRSH2 register.
  */
 void omap_mcbsp_set_tx_threshold(unsigned int id, u16 threshold)
 {
@@ -498,14 +498,15 @@ void omap_mcbsp_set_tx_threshold(unsigned int id, u16 threshold)
 	}
 	mcbsp = id_to_mcbsp_ptr(id);
 
-	MCBSP_WRITE(mcbsp, THRSH2, threshold);
+	if (threshold && threshold <= mcbsp->max_tx_thres)
+		MCBSP_WRITE(mcbsp, THRSH2, threshold - 1);
 }
 EXPORT_SYMBOL(omap_mcbsp_set_tx_threshold);
 
 /*
- * omap_mcbsp_set_rx_threshold configures how to deal
- * with receive threshold. the threshold value and handler can be
- * configure in here.
+ * omap_mcbsp_set_rx_threshold configures the receive threshold in words.
+ * The threshold parameter is 1 based, and it is converted (threshold - 1)
+ * for the THRSH1 register.
  */
 void omap_mcbsp_set_rx_threshold(unsigned int id, u16 threshold)
 {
@@ -520,7 +521,8 @@ void omap_mcbsp_set_rx_threshold(unsigned int id, u16 threshold)
 	}
 	mcbsp = id_to_mcbsp_ptr(id);
 
-	MCBSP_WRITE(mcbsp, THRSH1, threshold);
+	if (threshold && threshold <= mcbsp->max_rx_thres)
+		MCBSP_WRITE(mcbsp, THRSH1, threshold - 1);
 }
 EXPORT_SYMBOL(omap_mcbsp_set_rx_threshold);
 
@@ -559,6 +561,70 @@ u16 omap_mcbsp_get_max_rx_threshold(unsigned int id)
 	return mcbsp->max_rx_thres;
 }
 EXPORT_SYMBOL(omap_mcbsp_get_max_rx_threshold);
+
+u16 omap_mcbsp_get_fifo_size(unsigned int id)
+{
+	struct omap_mcbsp *mcbsp;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return -ENODEV;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+
+	return mcbsp->pdata->buffer_size;
+}
+EXPORT_SYMBOL(omap_mcbsp_get_fifo_size);
+
+/*
+ * omap_mcbsp_get_tx_delay returns the number of used slots in the McBSP FIFO
+ */
+u16 omap_mcbsp_get_tx_delay(unsigned int id)
+{
+	struct omap_mcbsp *mcbsp;
+	u16 buffstat;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return -ENODEV;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+
+	/* Returns the number of free locations in the buffer */
+	buffstat = MCBSP_READ(mcbsp, XBUFFSTAT);
+
+	/* Number of slots are different in McBSP ports */
+	return mcbsp->pdata->buffer_size - buffstat;
+}
+EXPORT_SYMBOL(omap_mcbsp_get_tx_delay);
+
+/*
+ * omap_mcbsp_get_rx_delay returns the number of free slots in the McBSP FIFO
+ * to reach the threshold value (when the DMA will be triggered to read it)
+ */
+u16 omap_mcbsp_get_rx_delay(unsigned int id)
+{
+	struct omap_mcbsp *mcbsp;
+	u16 buffstat, threshold;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return -ENODEV;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+
+	/* Returns the number of used locations in the buffer */
+	buffstat = MCBSP_READ(mcbsp, RBUFFSTAT);
+	/* RX threshold */
+	threshold = MCBSP_READ(mcbsp, THRSH1);
+
+	/* Return the number of location till we reach the threshold limit */
+	if (threshold <= buffstat)
+		return 0;
+	else
+		return threshold - buffstat;
+}
+EXPORT_SYMBOL(omap_mcbsp_get_rx_delay);
 
 /*
  * omap_mcbsp_get_dma_op_mode just return the current configured
@@ -724,14 +790,17 @@ int omap_mcbsp_request(unsigned int id)
 			goto err_clk_disable;
 		}
 
-		init_completion(&mcbsp->rx_irq_completion);
-		err = request_irq(mcbsp->rx_irq, omap_mcbsp_rx_irq_handler,
+		if (mcbsp->rx_irq) {
+			init_completion(&mcbsp->rx_irq_completion);
+			err = request_irq(mcbsp->rx_irq,
+					omap_mcbsp_rx_irq_handler,
 					0, "McBSP", (void *)mcbsp);
-		if (err != 0) {
-			dev_err(mcbsp->dev, "Unable to request RX IRQ %d "
-					"for McBSP%d\n", mcbsp->rx_irq,
-					mcbsp->id);
-			goto err_free_irq;
+			if (err != 0) {
+				dev_err(mcbsp->dev, "Unable to request RX IRQ %d "
+						"for McBSP%d\n", mcbsp->rx_irq,
+						mcbsp->id);
+				goto err_free_irq;
+			}
 		}
 	}
 
@@ -781,7 +850,8 @@ void omap_mcbsp_free(unsigned int id)
 
 	if (mcbsp->io_type == OMAP_MCBSP_IRQ_IO) {
 		/* Free IRQs */
-		free_irq(mcbsp->rx_irq, (void *)mcbsp);
+		if (mcbsp->rx_irq)
+			free_irq(mcbsp->rx_irq, (void *)mcbsp);
 		free_irq(mcbsp->tx_irq, (void *)mcbsp);
 	}
 
@@ -1624,8 +1694,16 @@ static inline void __devinit omap34xx_device_init(struct omap_mcbsp *mcbsp)
 {
 	mcbsp->dma_op_mode = MCBSP_DMA_MODE_ELEMENT;
 	if (cpu_is_omap34xx()) {
-		mcbsp->max_tx_thres = max_thres(mcbsp);
-		mcbsp->max_rx_thres = max_thres(mcbsp);
+		/*
+		 * Initially configure the maximum thresholds to a safe value.
+		 * The McBSP FIFO usage with these values should not go under
+		 * 16 locations.
+		 * If the whole FIFO without safety buffer is used, than there
+		 * is a possibility that the DMA will be not able to push the
+		 * new data on time, causing channel shifts in runtime.
+		 */
+		mcbsp->max_tx_thres = max_thres(mcbsp) - 0x10;
+		mcbsp->max_rx_thres = max_thres(mcbsp) - 0x10;
 		/*
 		 * REVISIT: Set dmap_op_mode to THRESHOLD as default
 		 * for mcbsp2 instances.

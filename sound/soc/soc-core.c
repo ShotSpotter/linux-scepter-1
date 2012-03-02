@@ -809,6 +809,41 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
+/*
+ * soc level wrapper for pointer callback
+ * If cpu_dai, codec_dai, platform driver has the delay callback, than
+ * the runtime->delay will be updated accordingly.
+ */
+static snd_pcm_uframes_t soc_pcm_pointer(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_device *socdev = rtd->socdev;
+	struct snd_soc_card *card = socdev->card;
+	struct snd_soc_platform *platform = card->platform;
+	struct snd_soc_dai_link *machine = rtd->dai;
+	struct snd_soc_dai *cpu_dai = machine->cpu_dai;
+	struct snd_soc_dai *codec_dai = machine->codec_dai;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	snd_pcm_uframes_t offset = 0;
+	snd_pcm_sframes_t delay = 0;
+
+	if (platform->pcm_ops->pointer)
+		offset = platform->pcm_ops->pointer(substream);
+
+	if (cpu_dai->ops->delay)
+		delay += cpu_dai->ops->delay(substream, cpu_dai);
+
+	if (codec_dai->ops->delay)
+		delay += codec_dai->ops->delay(substream, codec_dai);
+
+	if (platform->delay)
+		delay += platform->delay(substream, codec_dai);
+
+	runtime->delay = delay;
+
+	return offset;
+}
+
 /* ASoC PCM operations */
 static struct snd_pcm_ops soc_pcm_ops = {
 	.open		= soc_pcm_open,
@@ -817,6 +852,7 @@ static struct snd_pcm_ops soc_pcm_ops = {
 	.hw_free	= soc_pcm_hw_free,
 	.prepare	= soc_pcm_prepare,
 	.trigger	= soc_pcm_trigger,
+	.pointer	= soc_pcm_pointer,
 };
 
 #ifdef CONFIG_PM
@@ -1343,7 +1379,6 @@ static int soc_new_pcm(struct snd_soc_device *socdev,
 	dai_link->pcm = pcm;
 	pcm->private_data = rtd;
 	soc_pcm_ops.mmap = platform->pcm_ops->mmap;
-	soc_pcm_ops.pointer = platform->pcm_ops->pointer;
 	soc_pcm_ops.ioctl = platform->pcm_ops->ioctl;
 	soc_pcm_ops.copy = platform->pcm_ops->copy;
 	soc_pcm_ops.silence = platform->pcm_ops->silence;

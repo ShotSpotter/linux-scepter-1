@@ -301,6 +301,22 @@
 #define MCBSP_DMA_MODE_THRESHOLD	1
 #define MCBSP_DMA_MODE_FRAME		2
 
+/********************** McBSP IRQST / IRQEN bit definitions *********************/
+
+#define IRQ_XEMPTYEOF	0x4000
+#define IRQ_XOVFL			0x1000
+#define IRQ_XUNDFL		0x0800
+#define IRQ_XRDY			0x0400
+#define IRQ_XEOF			0x0200
+#define IRQ_XFSX			0x0100
+#define IRQ_XSYNCERR	0x0080
+#define IRQ_ROVFL			0x0020
+#define IRQ_RUNDFL		0x0010
+#define IRQ_RRDY			0x0008
+#define IRQ_REOF		 	0x0004
+#define IRQ_RFSR		 	0x0002
+#define IRQ_RSYNCERR	0x0001
+
 /********************** McBSP WAKEUPEN bit definitions *********************/
 #define XEMPTYEOFEN		0x4000
 #define XRDYEN			0x0400

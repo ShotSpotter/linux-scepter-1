@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34.9
-# Thu Mar  1 07:23:15 2012
+# Tue Mar  6 10:18:12 2012
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1053,7 +1053,7 @@ CONFIG_SENSORS_MCP3001=y
 CONFIG_THERMAL=y
 CONFIG_THERMAL_HWMON=y
 CONFIG_WATCHDOG=y
-# CONFIG_WATCHDOG_NOWAYOUT is not set
+CONFIG_WATCHDOG_NOWAYOUT=y
 
 #
 # Watchdog Device Drivers

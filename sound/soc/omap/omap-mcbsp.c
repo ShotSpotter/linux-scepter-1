@@ -150,6 +150,12 @@ static const unsigned long omap34xx_mcbsp_port[][2] = {
 static const unsigned long omap34xx_mcbsp_port[][2] = {};
 #endif
 
+static void omap_mcbsp_status_callback(int id, u32 status, void *data)
+{
+	struct snd_pcm_substream *substream = data; 
+	snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+}
+
 static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -209,7 +215,19 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
 	struct omap_mcbsp_data *mcbsp_data = to_mcbsp(cpu_dai->private_data);
 	int bus_id = mcbsp_data->bus_id;
+	int play = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
 	int err = 0;
+	u32 status_mask;
+
+
+	if (cpu_is_omap34xx()) {
+		if(play)
+			status_mask = IRQ_XOVFL | IRQ_XUNDFL | IRQ_XSYNCERR;
+		else
+			status_mask = IRQ_ROVFL | IRQ_RUNDFL | IRQ_RSYNCERR;
+
+		omap_mcbsp_status_request(bus_id,status_mask,omap_mcbsp_status_callback,substream);
+	}
 
 	if (!cpu_dai->active)
 		err = omap_mcbsp_request(bus_id);
@@ -257,6 +275,7 @@ static void omap_mcbsp_dai_shutdown(struct snd_pcm_substream *substream,
 
 	if (!cpu_dai->active) {
 		omap_mcbsp_free(mcbsp_data->bus_id);
+		omap_mcbsp_status_free(mcbsp_data->bus_id);
 		mcbsp_data->configured = 0;
 	}
 }

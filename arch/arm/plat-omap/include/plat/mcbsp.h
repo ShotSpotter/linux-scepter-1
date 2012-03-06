@@ -419,7 +419,7 @@ struct omap_mcbsp_ops {
 struct omap_mcbsp_platform_data {
 	unsigned long phys_base;
 	u8 dma_rx_sync, dma_tx_sync;
-	u16 rx_irq, tx_irq;
+	u16 rx_irq, tx_irq, status_irq;
 	struct omap_mcbsp_ops *ops;
 #ifdef CONFIG_ARCH_OMAP3
 	/* Sidetone block for McBSP 2 and 3 */
@@ -438,6 +438,12 @@ struct omap_mcbsp_st_data {
 	s16 ch1gain;
 };
 
+struct omap_mcbsp_status {
+	void (*callback)(int id, u32 status, void *data);
+	u32 mask;
+	void *data;
+};
+
 struct omap_mcbsp {
 	struct device *dev;
 	unsigned long phys_base;
@@ -451,6 +457,7 @@ struct omap_mcbsp {
 	/* IRQ based TX/RX */
 	int rx_irq;
 	int tx_irq;
+	int status_irq;
 
 	/* DMA stuff */
 	u8 dma_rx_sync;
@@ -463,6 +470,8 @@ struct omap_mcbsp {
 	struct completion rx_irq_completion;
 	struct completion tx_dma_completion;
 	struct completion rx_dma_completion;
+
+	struct omap_mcbsp_status status;
 
 	/* Protect the field .free, while checking if the mcbsp is in use */
 	spinlock_t lock;
@@ -493,6 +502,9 @@ u16 omap_mcbsp_get_fifo_size(unsigned int id);
 u16 omap_mcbsp_get_tx_delay(unsigned int id);
 u16 omap_mcbsp_get_rx_delay(unsigned int id);
 int omap_mcbsp_get_dma_op_mode(unsigned int id);
+int omap_mcbsp_status_request(unsigned int id, u32 mask,
+		     void (*callback)(int id, u32 status, void *data), void *data);
+void omap_mcbsp_status_free(unsigned int id);
 #else
 static inline void omap_mcbsp_set_tx_threshold(unsigned int id, u16 threshold)
 { }
@@ -504,6 +516,10 @@ static inline u16 omap_mcbsp_get_fifo_size(unsigned int id) { return 0; }
 static inline u16 omap_mcbsp_get_tx_delay(unsigned int id) { return 0; }
 static inline u16 omap_mcbsp_get_rx_delay(unsigned int id) { return 0; }
 static inline int omap_mcbsp_get_dma_op_mode(unsigned int id) { return 0; }
+int omap_mcbsp_status_request(unsigned int id, u32 mask,
+		     void (*callback)(int id, u32 status, void *data), void *data) { return 0;}
+void omap_mcbsp_status_free(unsigned int id)
+{ }
 #endif
 int omap_mcbsp_request(unsigned int id);
 void omap_mcbsp_free(unsigned int id);

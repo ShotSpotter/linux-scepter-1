@@ -132,6 +132,7 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
+		.status_irq = INT_34XX_MCBSP1_IRQ,
 		.ops		= &omap2_mcbsp_ops,
 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
 	},
@@ -142,6 +143,7 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
+		.status_irq = INT_34XX_MCBSP2_IRQ,
 		.ops		= &omap2_mcbsp_ops,
 		.buffer_size	= 0x500, /* The FIFO has 1024 + 256 locations */
 	},
@@ -152,6 +154,7 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
 		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
 		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
+		.status_irq = INT_34XX_MCBSP3_IRQ,
 		.ops		= &omap2_mcbsp_ops,
 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
 	},
@@ -161,6 +164,7 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
 		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
 		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
+		.status_irq = INT_34XX_MCBSP4_IRQ,
 		.ops		= &omap2_mcbsp_ops,
 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
 	},
@@ -170,6 +174,7 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
 		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
 		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
+		.status_irq = INT_34XX_MCBSP5_IRQ,
 		.ops		= &omap2_mcbsp_ops,
 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
 	},

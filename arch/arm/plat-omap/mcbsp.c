@@ -166,6 +166,27 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t omap_mcbsp_status_irq_handler(int irq, void *dev_id)
+{
+	struct omap_mcbsp *mcbsp = dev_id;
+	u32 irqst;
+	
+	irqst = MCBSP_READ(mcbsp,IRQST);
+
+	dev_dbg(mcbsp->dev, "Status callback : 0x%x\n", irqst);
+
+	irqst &= mcbsp->status.mask;
+
+	if(mcbsp->status.callback)
+		mcbsp->status.callback(mcbsp->id, irqst, mcbsp->status.data);
+	else
+		dev_err(mcbsp->dev, "No status callback");
+
+	MCBSP_WRITE(mcbsp,IRQST,irqst);
+
+	return IRQ_HANDLED;
+}
+
 static void omap_mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data)
 {
 	struct omap_mcbsp *mcbsp_dma_tx = data;
@@ -736,6 +757,94 @@ int omap_mcbsp_set_io_type(unsigned int id, omap_mcbsp_io_type_t io_type)
 	return 0;
 }
 EXPORT_SYMBOL(omap_mcbsp_set_io_type);
+
+
+int omap_mcbsp_status_request(unsigned int id, u32 mask, void (*callback)(int id, u32 status, void *data), void *data)
+{
+	struct omap_mcbsp *mcbsp;
+	int ret = 0;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return -ENODEV;
+	}
+
+	mcbsp = id_to_mcbsp_ptr(id);
+
+	if(!cpu_is_omap34xx())
+		return -EINVAL;
+	
+	if(!mcbsp->status_irq) {
+		dev_notice(mcbsp->dev,"No status IRQ defined for McBSP%d\n",mcbsp->id);
+		return -ENODEV;
+	}
+
+	spin_lock(&mcbsp->lock);
+	if(mcbsp->status.callback) {
+		printk(KERN_ERR "Status callback already defined for McBSP %d\n",mcbsp->id);
+		ret = -EINVAL;
+		goto status_unlock;
+	}
+
+	MCBSP_WRITE(mcbsp, IRQST, mask);
+	MCBSP_WRITE(mcbsp, IRQEN, 0);
+	mcbsp->status.callback = callback;
+	mcbsp->status.mask = mask;
+	mcbsp->status.data = data;
+
+	ret = request_irq(mcbsp->status_irq, omap_mcbsp_status_irq_handler,
+										0,"McBSP", (void *)mcbsp);
+	if (ret != 0) {
+		mcbsp->status.callback = NULL;
+		mcbsp->status.data = NULL;
+		dev_err(mcbsp->dev, "Unable to request status IRQ %d "
+						"for McBSP%d\n", mcbsp->status_irq,
+						mcbsp->id);
+		goto status_unlock;
+	} 
+	else
+		MCBSP_WRITE(mcbsp, IRQEN, mask);
+
+status_unlock:
+	spin_unlock(&mcbsp->lock);
+	return ret;
+}
+
+EXPORT_SYMBOL_GPL(omap_mcbsp_status_request);
+
+
+void omap_mcbsp_status_free(unsigned int id)
+{
+	struct omap_mcbsp *mcbsp;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+
+	if(!cpu_is_omap34xx())
+		return;
+
+	if(!mcbsp->status_irq)
+		return;
+
+	spin_lock(&mcbsp->lock);
+
+	if(!mcbsp->status.callback)
+		goto status_unlock;
+
+	free_irq(mcbsp->status_irq, (void *)mcbsp);
+
+	mcbsp->status.callback = NULL;
+	mcbsp->status.data = NULL;
+
+status_unlock:
+	spin_unlock(&mcbsp->lock);
+	return;
+}
+EXPORT_SYMBOL_GPL(omap_mcbsp_status_free);
+
 
 int omap_mcbsp_request(unsigned int id)
 {
@@ -1790,6 +1899,7 @@ static int __devinit omap_mcbsp_probe(struct platform_device *pdev)
 	mcbsp->io_type = OMAP_MCBSP_IRQ_IO;
 	mcbsp->tx_irq = pdata->tx_irq;
 	mcbsp->rx_irq = pdata->rx_irq;
+	mcbsp->status_irq = pdata->status_irq;
 	mcbsp->dma_rx_sync = pdata->dma_rx_sync;
 	mcbsp->dma_tx_sync = pdata->dma_tx_sync;
 

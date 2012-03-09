@@ -220,17 +220,20 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 	u32 status_mask;
 
 
-	if (cpu_is_omap34xx()) {
-		if(play)
-			status_mask = IRQ_XOVFL | IRQ_XUNDFL | IRQ_XSYNCERR;
-		else
-			status_mask = IRQ_ROVFL | IRQ_RUNDFL | IRQ_RSYNCERR;
-
-		omap_mcbsp_status_request(bus_id,status_mask,omap_mcbsp_status_callback,substream);
-	}
 
 	if (!cpu_dai->active)
 		err = omap_mcbsp_request(bus_id);
+		if (err)
+			return err;
+
+		if (cpu_is_omap34xx()) {
+			if(play)
+				status_mask = IRQ_XOVFL | IRQ_XUNDFL | IRQ_XSYNCERR;
+			else
+				status_mask = IRQ_ROVFL | IRQ_RUNDFL | IRQ_RSYNCERR;
+
+			omap_mcbsp_status_request(bus_id,status_mask,omap_mcbsp_status_callback,substream);
+		}
 
 	/*
 	 * OMAP3 McBSP FIFO is word structured.
@@ -274,8 +277,8 @@ static void omap_mcbsp_dai_shutdown(struct snd_pcm_substream *substream,
 	struct omap_mcbsp_data *mcbsp_data = to_mcbsp(cpu_dai->private_data);
 
 	if (!cpu_dai->active) {
-		omap_mcbsp_free(mcbsp_data->bus_id);
 		omap_mcbsp_status_free(mcbsp_data->bus_id);
+		omap_mcbsp_free(mcbsp_data->bus_id);
 		mcbsp_data->configured = 0;
 	}
 }

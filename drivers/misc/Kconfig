@@ -20,6 +20,13 @@ config GPT
 	  If you say yes here, you get the Event capture interface via
 	  General Purpose timer 10. 
 
+config CPLD
+	tristate "CPLD driver for the Scepter board"
+	depends on MACH_SCEPTER
+	help
+	  If you say yes here, you get the CPLD driver with an associated
+	  /proc control interface.
+
 config AD525X_DPOT
 	tristate "Analog Devices AD525x Digital Potentiometers"
 	depends on I2C && SYSFS

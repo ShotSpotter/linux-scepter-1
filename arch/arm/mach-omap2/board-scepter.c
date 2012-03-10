@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-omap2/board-scepter.c
  *
- * Copyright (C) 2012 HY Research LLC 
+ * Copyright (C) 2012 HY Research LLC
  * Author: Hunyue Yau <hy-git@hy-research.com>
  *
  * Based on mach-omap2/board-am3517evm.c
@@ -174,8 +174,6 @@ static struct platform_device leds_gpio = {
 		.platform_data	= &gpio_led_info,
 	},
 };
-
-
 
 #define AM35XX_EVM_PHY_MASK          (0xF)
 #define AM35XX_EVM_MDIO_FREQUENCY    (1000000) /*PHY bus frequency */
@@ -517,7 +515,7 @@ static void __init scepter_init_irq(void)
 static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
 	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
 	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
 	.reset_gpio_port[0]  = 57,
@@ -527,9 +525,9 @@ static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
 
 #define ohci_hcd_omap_platform_data ehci_hcd_omap_platform_data
 static const struct ohci_hcd_omap_platform_data ohci_pdata __initconst = {
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
 	.reset_gpio_port[0]  = 57,
@@ -601,7 +599,7 @@ static struct resource ohci_resources[] = {
 		.start	= OMAP_OHCI_BASE,
 		.end	= OMAP_OHCI_BASE + 0xff,
 		.flags	= IORESOURCE_MEM,
-	},
+},
 	{
 		.start	= INT_34XX_OHCI_IRQ,
 		.flags	= IORESOURCE_IRQ,
@@ -765,6 +763,11 @@ static void __init scepter_init(void)
 				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
 	/* MMC init function */
 	omap2_hsmmc_init(mmc);
+
+        /* CPLD - Set the version gpio pins to MODE 4 and IN */
+        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 67);
+        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 68);
+        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 69);
 }
 
 static void __init scepter_map_io(void)

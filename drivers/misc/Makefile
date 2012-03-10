@@ -33,3 +33,4 @@ obj-y				+= cb710/
 obj-$(CONFIG_VMWARE_BALLOON)	+= vmware_balloon.o
 obj-$(CONFIG_RAM_CONSOLE)	+= ram_console.o
 obj-$(CONFIG_GPT)		+= gpt.o
+obj-$(CONFIG_CPLD)		+= cpld.o

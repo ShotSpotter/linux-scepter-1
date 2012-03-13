@@ -513,24 +513,24 @@ static void __init scepter_init_irq(void)
 }
 
 static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
-	.reset_gpio_port[0]  = 57,
+	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
 	.reset_gpio_port[2]  = -EINVAL
 };
 
 #define ohci_hcd_omap_platform_data ehci_hcd_omap_platform_data
 static const struct ohci_hcd_omap_platform_data ohci_pdata __initconst = {
-	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[0] = OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
-	.phy_reset  = true,
-	.reset_gpio_port[0]  = 57,
+	.phy_reset  = false,
+	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
 	.reset_gpio_port[2]  = -EINVAL
 };
@@ -596,10 +596,10 @@ static u64 ohci_dmamask = ~(u32)0;
 
 static struct resource ohci_resources[] = {
 	{
-		.start	= OMAP_OHCI_BASE,
-		.end	= OMAP_OHCI_BASE + 0xff,
+		.start	= OMAP34XX_OHCI_BASE,
+		.end	= OMAP34XX_OHCI_BASE + SZ_1K - 1,
 		.flags	= IORESOURCE_MEM,
-},
+	},
 	{
 		.start	= INT_34XX_OHCI_IRQ,
 		.flags	= IORESOURCE_IRQ,
@@ -607,8 +607,8 @@ static struct resource ohci_resources[] = {
 };
 
 static struct platform_device ohci_device = {
-	.name			= "ohci",
-	.id			= -1,
+	.name			= "ohci-omap3",
+	.id			= 0,
 	.dev = {
 		.dma_mask		= &ohci_dmamask,
 		.coherent_dma_mask	= 0xffffffff,
@@ -735,11 +735,24 @@ static void __init scepter_spi_init(void)
 			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
+static void __init scepter_cpu_usb_speed_init(void)
+{
+	int r;
+	int gpio = 75;
 
+	r = gpio_request(gpio, "cpu-usb-speed");
+	if (r < 0) {
+		printk(KERN_ERR "failed to request GPIO#%d\n", gpio);
+		return;
+	}
+	gpio_direction_output(gpio, 1);
+}
 
 static void __init scepter_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+
+	scepter_cpu_usb_speed_init();
 
 	scepter_i2c_init();
 	platform_add_devices(scepter_devices,

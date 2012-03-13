@@ -30,14 +30,16 @@
  */
 #include <linux/regulator/wm8737-mvdd-regulator.h>
 #include "../../sound/soc/codecs/wm8737.h"
+#include <linux/regulator/machine.h>
 
 struct wm8737_mvdd_data {
 	struct regulator_desc desc;
-	struct regulator_dev *dev;
+	struct regulator_dev *rdev;
 	int micbias_cached;
 	int enabled;
 	struct snd_soc_dai *dai;
 	int avdd_mV; //Only support one value for now
+	struct mutex mutex;
 };
 
 #define NUM_MICBIAS_LVL 4
@@ -50,69 +52,79 @@ const static int avdd_multiplier[NUM_MICBIAS_LVL] =
 		1200
 };
 
-static int wm8737_mvdd_is_enabled(struct regulator_dev *dev)
+static int wm8737_mvdd_is_enabled(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
-	struct snd_soc_dai *dai = data->dai;
-	struct snd_soc_codec *codec	= dai->codec;
-
-	if(!codec)
-		return -ENXIO;
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
 
 	return data->enabled;
 }
 
-static int wm8737_mvdd_enable(struct regulator_dev *dev)
+static int wm8737_mvdd_enable(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
+	int ret = 0;
 
-	if(!codec)
-		return -ENXIO;
-
+	mutex_lock(&data->mutex);
+	if(!codec && data->micbias_cached != 0) {
+		ret = -ENXIO;
+		goto out;
+	}
 	data->enabled = 1;
+
+	if(!data->micbias_cached)
+		goto out;
 
 	snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,
 			WM8737_MICBIAS_MASK, data->micbias_cached);
 
-	return 0;
+out:
+	mutex_unlock(&data->mutex);
+	return ret;
 }
 
-static int wm8737_mvdd_disable(struct regulator_dev *dev)
+static int wm8737_mvdd_disable(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
+	int ret = 0;
 
-	if(!codec)
-		return -ENXIO;
+	mutex_lock(&data->mutex);
+	if(!codec && data->micbias_cached != 0) {
+		ret = -ENXIO;
+		goto out;
+	}
 
 	data->enabled = 0;
+
+	if(!data->micbias_cached)
+		goto out;
 
 	snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,
 			WM8737_MICBIAS_MASK, 0);
 
-	return 0;
+out:
+	mutex_unlock(&data->mutex);
+	return ret;
 }
 
 
-static int wm8737_mvdd_get_voltage(struct regulator_dev *dev)
+static int wm8737_mvdd_get_voltage(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
-	struct snd_soc_dai *dai = data->dai;
-	struct snd_soc_codec *codec	= dai->codec;
-
-	if(!codec)
-		return -ENXIO;
-
-	return data->avdd_mV * avdd_multiplier[data->micbias_cached];
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	int ret;
+	mutex_lock(&data->mutex);
+	ret = data->avdd_mV * avdd_multiplier[data->micbias_cached];
+	mutex_unlock(&data->mutex);
+	return ret;
 }
 
 static int
-wm8737_mvdd_set_voltage(struct regulator_dev *dev, int min_uV, int max_uV)
+wm8737_mvdd_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
 	int vsel;
@@ -133,24 +145,23 @@ wm8737_mvdd_set_voltage(struct regulator_dev *dev, int min_uV, int max_uV)
 	if(vsel == NUM_MICBIAS_LVL)
 		return -EDOM;
 
+	mutex_lock(&data->mutex);
+
 	data->micbias_cached = vsel;
 
 	if(data->enabled)
 		snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,
 			WM8737_MICBIAS_MASK, data->micbias_cached);
 
+	mutex_unlock(&data->mutex);
+
 	return 0;
 }
 
-static int wm8737_mvdd_list_voltage(struct regulator_dev *dev,
+static int wm8737_mvdd_list_voltage(struct regulator_dev *rdev,
 				      unsigned selector)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(dev);
-	struct snd_soc_dai *dai = data->dai;
-	struct snd_soc_codec *codec	= dai->codec;
-
-	if(!codec)
-		return -ENXIO;
+	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
 
 	if(selector >= NUM_MICBIAS_LVL)
 		return -EINVAL;
@@ -166,6 +177,28 @@ static struct regulator_ops wm8737_mvdd_ops = {
 	.set_voltage = wm8737_mvdd_set_voltage,
 	.list_voltage = wm8737_mvdd_list_voltage,
 };
+
+static ssize_t mvdd_voltage_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	long value;
+	ssize_t			status;
+
+	status = strict_strtol(buf, 0, &value);
+
+	if (status == 0)
+		status = wm8737_mvdd_set_voltage(rdev,value,value);
+
+	if(status == 0)
+		status = size;
+
+	return status;
+}
+
+static const DEVICE_ATTR(microvolts_set, 0200,
+		NULL, mvdd_voltage_store);
+
 
 static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 {
@@ -190,14 +223,14 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 	if (drvdata == NULL) {
 		dev_err(&pdev->dev, "Failed to allocate device data\n");
 		ret = -ENOMEM;
-		goto err;
+		return ret;
 	}
 
 	name = kzalloc(NAME_SZ, GFP_KERNEL);
 	if (name == NULL) {
 		dev_err(&pdev->dev, "Failed to allocate supply name\n");
 		ret = -ENOMEM;
-		goto err;
+		goto err_drvdata;
 	}
 
 	snprintf(name,NAME_SZ,"wm8737-mvdd-reg-%d",id);
@@ -211,26 +244,38 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 
 	drvdata->micbias_cached = 0;
 	drvdata->dai = &wm8737_dai[id];
+
 	drvdata->enabled = 0;
 	drvdata->avdd_mV = config->avdd_mV;
+	config->init_data->constraints.min_uV = 1;
+	config->init_data->constraints.max_uV = config->avdd_mV * avdd_multiplier[NUM_MICBIAS_LVL-1];
 
-	drvdata->dev = regulator_register(&drvdata->desc, &pdev->dev,
+	mutex_init(&drvdata->mutex);
+
+	drvdata->rdev = regulator_register(&drvdata->desc, &pdev->dev,
 					  config->init_data, drvdata);
 
-	if (IS_ERR(drvdata->dev)) {
-		ret = PTR_ERR(drvdata->dev);
+	if (IS_ERR(drvdata->rdev)) {
+		ret = PTR_ERR(drvdata->rdev);
 		dev_err(&pdev->dev, "Failed to register regulator: %d\n", ret);
 		goto err_name;
 	}
+
+	ret = device_create_file(&drvdata->rdev->dev, &dev_attr_microvolts_set);
+	if (ret < 0)
+		goto err_regulator;
 
 	platform_set_drvdata(pdev, drvdata);
 
 	return 0;
 
+err_regulator:
+	regulator_unregister(drvdata->rdev);
 err_name:
 	kfree(drvdata->desc.name);
-err:
+err_drvdata:
 	kfree(drvdata);
+
 	return ret;
 }
 
@@ -238,7 +283,7 @@ static int __devexit wm8737_mvdd_remove(struct platform_device *pdev)
 {
 	struct wm8737_mvdd_data *drvdata = platform_get_drvdata(pdev);
 
-	regulator_unregister(drvdata->dev);
+	regulator_unregister(drvdata->rdev);
 	kfree(drvdata->desc.name);
 	kfree(drvdata);
 

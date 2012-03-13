@@ -2,7 +2,7 @@
 #define _WM8737_H
 
 /*
- * wm8737.c  --  WM8523 ALSA SoC Audio driver
+ * wm8737.h  --  WM8523 ALSA SoC Audio driver
  *
  * Copyright 2010 Wolfson Microelectronics plc
  *
@@ -12,6 +12,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+#include <sound/wm8737.h>
 
 extern struct snd_soc_dai wm8737_dai[MAX_WM8737_CNT];
 extern struct snd_soc_codec_device soc_codec_dev_wm8737;

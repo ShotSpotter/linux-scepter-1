@@ -51,7 +51,6 @@
 struct wm8737_sync_soc {
 	struct snd_soc_card sound_soc;
 	struct snd_soc_device snd_devdata;
-	struct wm8737_setup_data wm8737_setup;
 	struct platform_device *snd_device;
 	struct snd_soc_dai_link dai;
 	unsigned int codec_daifmt;
@@ -254,11 +253,8 @@ static int wm8737_omap_soc_register(struct wm8737_sync_soc *wm8737_soc,
 	wm8737_soc->sound_soc.dai_link = &wm8737_soc->dai;
 	wm8737_soc->sound_soc.num_links = 1;
 	
-	wm8737_soc->wm8737_setup.id = wm8737_omap->wm8737_id;
-	
 	wm8737_soc->snd_devdata.card = &wm8737_soc->sound_soc;
 	wm8737_soc->snd_devdata.codec_dev = &soc_codec_dev_wm8737;
-	wm8737_soc->snd_devdata.codec_data = &wm8737_soc->wm8737_setup;
 	
 	platform_set_drvdata(wm8737_soc->snd_device, &wm8737_soc->snd_devdata);
 	wm8737_soc->snd_devdata.dev = &wm8737_soc->snd_device->dev;

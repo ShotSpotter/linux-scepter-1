@@ -13,10 +13,6 @@
  * published by the Free Software Foundation.
  */
 
-struct wm8737_setup_data {
-	int id;
-};
-
 extern struct snd_soc_dai wm8737_dai[MAX_WM8737_CNT];
 extern struct snd_soc_codec_device soc_codec_dev_wm8737;
 

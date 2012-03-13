@@ -596,17 +596,16 @@ static int wm8737_probe(struct platform_device *pdev)
 {
 	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
 	struct snd_soc_codec *codec;
-	struct wm8737_setup_data *setup = socdev->codec_data;
 	int ret = 0;
 	int id;
 
-	if(setup && setup->id > MAX_WM8737_ID) {
-		dev_err(&pdev->dev, "Invalid wm8737 ID of %d\n",setup->id);
+	if(pdev->id > MAX_WM8737_ID) {
+		dev_err(&pdev->dev, "Invalid wm8737 ID of %d\n",pdev->id);
 		return -EINVAL;
 	}
 
-	if(setup && setup->id >= 0)
-		id = setup->id;
+	if(pdev->id >= 0)
+		id = pdev->id;
 	else
 		id = 0;
 

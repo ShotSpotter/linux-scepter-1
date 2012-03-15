@@ -28,6 +28,7 @@
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/nand.h>
 #include <linux/mmc/host.h>
+#include <linux/delay.h>
 
 #include <mach/hardware.h>
 #include <mach/am35xx.h>
@@ -415,32 +416,6 @@ static struct i2c_board_info __initdata am3517evm_i2c1_boardinfo[] = {
 };
 
 /*
- * RTC - S35390A
- */
-#define GPIO_RTCS35390A_IRQ	55
-
-static void __init am3517_evm_rtc_init(void)
-{
-	int r;
-
-	omap_mux_init_gpio(GPIO_RTCS35390A_IRQ, OMAP_PIN_INPUT_PULLUP);
-	r = gpio_request(GPIO_RTCS35390A_IRQ, "rtcs35390a-irq");
-	if (r < 0) {
-		printk(KERN_WARNING "failed to request GPIO#%d\n",
-				GPIO_RTCS35390A_IRQ);
-		return;
-	}
-	r = gpio_direction_input(GPIO_RTCS35390A_IRQ);
-	if (r < 0) {
-		printk(KERN_WARNING "GPIO#%d cannot be configured as input\n",
-				GPIO_RTCS35390A_IRQ);
-		gpio_free(GPIO_RTCS35390A_IRQ);
-		return;
-	}
-	am3517evm_i2c1_boardinfo[1].irq = gpio_to_irq(GPIO_RTCS35390A_IRQ);
-}
-
-/*
  * I2C GPIO Expander - TCA6416
  */
 
@@ -735,11 +710,68 @@ static void __init scepter_spi_init(void)
 			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
+#define GSM_3304_ON 54
+#define GSM_PWRON 55
+#define GSM_HWR 64
+
+static void __init scepter_gsm_init(void)
+{
+	int r, i;
+
+	omap_mux_init_gpio(GSM_PWRON, OMAP_PIN_OUTPUT);
+	r = gpio_request(GSM_PWRON, "gsm-pwron");
+	if (r < 0) {
+		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_PWRON);
+		return;
+	}
+	gpio_direction_output(GSM_PWRON, 0);
+
+        omap_mux_init_gpio(GSM_HWR, OMAP_PIN_INPUT);
+	r = gpio_request(GSM_HWR, "gsm-hwr");
+	if (r < 0) {
+		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_HWR);
+		return;
+	}
+	gpio_direction_input(GSM_HWR);
+
+	omap_mux_init_gpio(GSM_3304_ON, OMAP_PIN_OUTPUT);
+	r = gpio_request(GSM_3304_ON, "gsm-3304-on");
+	if (r < 0) {
+		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_3304_ON);
+		return;
+	}
+	gpio_direction_output(GSM_3304_ON, 0);
+
+#if 0
+        msleep(20000);
+        printk("[GSM] modem HW state: %d\n", gpio_get_value(GSM_HWR));
+        gpio_set_value(GSM_3304_ON, 1);
+        msleep(1);
+        gpio_set_value(GSM_3304_ON, 0);
+#endif
+
+	for (i = 0; i < 2000; i++) {
+		msleep(1);
+		r = gpio_get_value(GSM_HWR);
+		if (r  == 0) break;
+	}
+	gpio_set_value(GSM_3304_ON, 1);
+
+	if (r != 0) {
+		printk(KERN_ERR "[GSM] initialization failed.\n");
+		return;
+	}
+
+	printk(KERN_INFO "GSM module successfully initialized [%d].\n", i);
+}
+
 static void __init scepter_cpu_usb_speed_init(void)
 {
 	int r;
-	int gpio = 75;
+	int gpio = 74;
 
+        printk("Setting USB speed ...\n");
+	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
 	r = gpio_request(gpio, "cpu-usb-speed");
 	if (r < 0) {
 		printk(KERN_ERR "failed to request GPIO#%d\n", gpio);
@@ -753,6 +785,7 @@ static void __init scepter_init(void)
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
 
 	scepter_cpu_usb_speed_init();
+	scepter_gsm_init();
 
 	scepter_i2c_init();
 	platform_add_devices(scepter_devices,
@@ -768,9 +801,6 @@ static void __init scepter_init(void)
 	usb_ohci_init(&ohci_pdata);
 
 	scepter_ethernet_init(&scepter_emac_pdata);
-
-	/* RTC - S35390A */
-	am3517_evm_rtc_init();
 
 	i2c_register_board_info(1, am3517evm_i2c1_boardinfo,
 				ARRAY_SIZE(am3517evm_i2c1_boardinfo));

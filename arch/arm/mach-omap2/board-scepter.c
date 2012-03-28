@@ -724,6 +724,7 @@ static void __init scepter_gsm_init(void)
 		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_PWRON);
 		return;
 	}
+	gpio_export(GSM_PWRON,0);
 	gpio_direction_output(GSM_PWRON, 0);
 
         omap_mux_init_gpio(GSM_HWR, OMAP_PIN_INPUT);
@@ -732,6 +733,7 @@ static void __init scepter_gsm_init(void)
 		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_HWR);
 		return;
 	}
+	gpio_export(GSM_HWR,0);
 	gpio_direction_input(GSM_HWR);
 
 	omap_mux_init_gpio(GSM_3304_ON, OMAP_PIN_OUTPUT);
@@ -740,6 +742,7 @@ static void __init scepter_gsm_init(void)
 		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_3304_ON);
 		return;
 	}
+	gpio_export(GSM_3304_ON,0);
 	gpio_direction_output(GSM_3304_ON, 0);
 
 #if 0

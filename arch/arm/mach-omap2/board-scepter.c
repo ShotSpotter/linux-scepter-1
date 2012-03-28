@@ -758,8 +758,18 @@ static void __init scepter_gsm_init(void)
 		r = gpio_get_value(GSM_HWR);
 		if (r  == 0) break;
 	}
-	gpio_set_value(GSM_3304_ON, 1);
+	/*Note - ericsson integrators guide '2/1553-KRD 131 24 Uen Rev A'
+	 * indicates that POWER_ON (GSM_3304_ON_N) should be negated within
+	 * 10 seconds of HW_READY (GSM_HWR_N) being asserted or else
+	 * the module will enter an uncontrolled shutdown.  However,
+	 * testing suggests that negating POWER_ON will actually turn off
+	 * the module.
+	 */
 
+	/* TODO the board comes up with POWER_ON assertedd.
+	 * A period of time with POWER_ON negated may be necessary but this has not been
+	 * tested.
+	 */
 	if (r != 0) {
 		printk(KERN_ERR "[GSM] initialization failed.\n");
 		return;

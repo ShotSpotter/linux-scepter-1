@@ -470,27 +470,11 @@ static void __init scepter_init_irq(void)
 	omap_gpio_init();
 }
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
-
-	.phy_reset  = true,
-	.reset_gpio_port[0]  = -EINVAL,
-	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
-};
-
-#define ohci_hcd_omap_platform_data ehci_hcd_omap_platform_data
 static const struct ohci_hcd_omap_platform_data ohci_pdata __initconst = {
-	.port_mode[0] = OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM,
-	.port_mode[1] = OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM,
-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
-
-	.phy_reset  = false,
-	.reset_gpio_port[0]  = -EINVAL,
-	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
+	.port_mode[0] = OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM,
+	.port_mode[2] = OMAP_OHCI_PORT_MODE_UNUSED,
+	.es2_compatibility = 1, /*p1, p2, and p3 bypass do not exist*/
 };
 
 #ifdef CONFIG_OMAP_MUX
@@ -653,9 +637,6 @@ static void __init scepter_init(void)
 	omap_serial_init();
 	scepter_flash_init();
 
-	/* Configure GPIO for EHCI port */
-	omap_mux_init_gpio(57, OMAP_PIN_OUTPUT);
-	usb_ehci_init(&ehci_pdata);
 	usb_ohci_init(&ohci_pdata);
 
 	scepter_ethernet_init(&scepter_emac_pdata);

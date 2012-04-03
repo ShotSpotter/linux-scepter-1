@@ -382,16 +382,13 @@ static int omap3_start_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 	 *
 	 * For now, turn off all the Pi_CONNECT_STATUS bits
 	 *
+	*/
 	if (omap->port_mode[0] == OMAP_OHCI_PORT_MODE_UNUSED)
 		reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
 	if (omap->port_mode[1] == OMAP_OHCI_PORT_MODE_UNUSED)
 		reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
 	if (omap->port_mode[2] == OMAP_OHCI_PORT_MODE_UNUSED)
 		reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
-	 */
-	reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
-	reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
-	reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
 
 	 if (omap->es2_compatibility) {
 		/*

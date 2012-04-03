@@ -154,17 +154,17 @@ struct ohci_hcd_omap3 {
 static void ohci_omap3_clock_power(struct ohci_hcd_omap3 *omap, int on)
 {
 	if (on) {
-		clk_enable(omap->usbtll_ick);
-		clk_enable(omap->usbtll_fck);
 		clk_enable(omap->usbhost_ick);
-		clk_enable(omap->usbhost1_48m_fck);
 		clk_enable(omap->usbhost2_120m_fck);
+		clk_enable(omap->usbhost1_48m_fck);
+		clk_enable(omap->usbtll_fck);
+		clk_enable(omap->usbtll_ick);
 	} else {
-		clk_disable(omap->usbhost2_120m_fck);
-		clk_disable(omap->usbhost1_48m_fck);
-		clk_disable(omap->usbhost_ick);
-		clk_disable(omap->usbtll_fck);
 		clk_disable(omap->usbtll_ick);
+		clk_disable(omap->usbtll_fck);
+		clk_disable(omap->usbhost1_48m_fck);
+		clk_disable(omap->usbhost2_120m_fck);
+		clk_disable(omap->usbhost_ick);
 	}
 }
 

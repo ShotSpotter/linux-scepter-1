@@ -19,6 +19,7 @@
  * This file is licenced under the GPL.
  */
 
+#define OHCI_VERBOSE_DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/pci.h>
@@ -51,7 +52,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-#undef OHCI_VERBOSE_DEBUG	/* not always helpful */
+//#undef OHCI_VERBOSE_DEBUG	/* not always helpful */
 
 /* For initializing controller (mask in an HCFS mode too) */
 #define	OHCI_CONTROL_INIT	OHCI_CTRL_CBSR

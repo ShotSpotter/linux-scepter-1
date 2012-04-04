@@ -170,8 +170,6 @@ static void ohci_omap3_clock_power(struct ohci_hcd_omap3 *omap, int on)
 
 static int ohci_omap3_init(struct usb_hcd *hcd)
 {
-	dev_dbg(hcd->self.controller, "starting OHCI controller\n");
-
 	return ohci_init(hcd_to_ohci(hcd));
 }
 

@@ -21,7 +21,6 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/davinci_emac.h>
-#include <linux/i2c/pca953x.h>
 #include <linux/i2c/at24.h>
 #include <linux/regulator/machine.h>
 #include <linux/mtd/mtd.h>
@@ -288,148 +287,11 @@ void scepter_ethernet_init(struct emac_platform_data *pdata)
  }
 
 /* TPS65023 specific initialization */
-/* VDCDC1 -> VDD_CORE */
-static struct regulator_consumer_supply am3517_evm_vdcdc1_supplies[] = {
-	{
-		.supply = "vdd_core",
-	},
-};
 
-/* VDCDC2 -> VDDSHV */
-static struct regulator_consumer_supply am3517_evm_vdcdc2_supplies[] = {
+#define TPS65910_I2C_ADDRESS 0x2D
+static struct i2c_board_info __initdata scepter_i2c1_boardinfo[] = {
 	{
-		.supply = "vddshv",
-	},
-};
-
-/* VDCDC2 |-> VDDS
-	   |-> VDDS_SRAM_CORE_BG
-	   |-> VDDS_SRAM_MPU */
-static struct regulator_consumer_supply am3517_evm_vdcdc3_supplies[] = {
-	{
-		.supply = "vdds",
-	},
-	{
-		.supply = "vdds_sram_core_bg",
-	},
-	{
-		.supply = "vdds_sram_mpu",
-	},
-};
-
-/* LDO1 |-> VDDA1P8V_USBPHY
-	 |-> VDDA_DAC */
-static struct regulator_consumer_supply am3517_evm_ldo1_supplies[] = {
-	{
-		.supply = "vdda1p8v_usbphy",
-	},
-	{
-		.supply = "vdda_dac",
-	},
-};
-
-/* LDO2 -> VDDA3P3V_USBPHY */
-static struct regulator_consumer_supply am3517_evm_ldo2_supplies[] = {
-	{
-		.supply = "vdda3p3v_usbphy",
-	},
-};
-
-static struct regulator_init_data am3517_evm_regulator_data[] = {
-	/* DCDC1 */
-	{
-		.constraints = {
-			.min_uV = 1200000,
-			.max_uV = 1200000,
-			.valid_modes_mask = REGULATOR_MODE_NORMAL,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-			.always_on = true,
-			.apply_uV = false,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc1_supplies),
-		.consumer_supplies = am3517_evm_vdcdc1_supplies,
-	},
-	/* DCDC2 */
-	{
-		.constraints = {
-			.min_uV = 3300000,
-			.max_uV = 3300000,
-			.valid_modes_mask = REGULATOR_MODE_NORMAL,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-			.always_on = true,
-			.apply_uV = false,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc2_supplies),
-		.consumer_supplies = am3517_evm_vdcdc2_supplies,
-	},
-	/* DCDC3 */
-	{
-		.constraints = {
-			.min_uV = 1800000,
-			.max_uV = 1800000,
-			.valid_modes_mask = REGULATOR_MODE_NORMAL,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-			.always_on = true,
-			.apply_uV = false,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_vdcdc3_supplies),
-		.consumer_supplies = am3517_evm_vdcdc3_supplies,
-	},
-	/* LDO1 */
-	{
-		.constraints = {
-			.min_uV = 1800000,
-			.max_uV = 1800000,
-			.valid_modes_mask = REGULATOR_MODE_NORMAL,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-			.always_on = false,
-			.apply_uV = false,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_ldo1_supplies),
-		.consumer_supplies = am3517_evm_ldo1_supplies,
-	},
-	/* LDO2 */
-	{
-		.constraints = {
-			.min_uV = 3300000,
-			.max_uV = 3300000,
-			.valid_modes_mask = REGULATOR_MODE_NORMAL,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-			.always_on = false,
-			.apply_uV = false,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(am3517_evm_ldo2_supplies),
-		.consumer_supplies = am3517_evm_ldo2_supplies,
-	},
-};
-
-static struct i2c_board_info __initdata am3517evm_i2c1_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("s35390a", 0x30),
-		.type		= "s35390a",
-	},
-	{
-		I2C_BOARD_INFO("tps65023", 0x48),
-		.flags = I2C_CLIENT_WAKE,
-		.platform_data = &am3517_evm_regulator_data[0],
-	},
-};
-
-/*
- * I2C GPIO Expander - TCA6416
- */
-
-/* Mounted on Base-Board */
-static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
-	.gpio_base	= OMAP_MAX_GPIO_LINES,
-};
-static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tlv320aic23", 0x1A),
-	},
-	{
-		I2C_BOARD_INFO("tca6416", 0x21),
-		.platform_data = &am3517evm_gpio_expander_info_0,
+		I2C_BOARD_INFO("tps65910", TPS65910_I2C_ADDRESS),
 	},
 };
 
@@ -442,8 +304,6 @@ static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 static int __init scepter_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 200, NULL, 0);
-	omap_register_i2c_bus(2, 400, am3517evm_i2c2_boardinfo,
-			ARRAY_SIZE(am3517evm_i2c2_boardinfo));
 	omap_register_i2c_bus(3, 400, scepter_i2c3_boardinfo,
 			ARRAY_SIZE(scepter_i2c3_boardinfo));
 
@@ -539,9 +399,9 @@ static void __init scepter_spi_init(void)
 			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
-#define GSM_3304_ON 54
-#define GSM_PWRON 55
-#define GSM_HWR 64
+#define GSM_3304_ON	54
+#define GSM_PWRON	55
+#define GSM_HWR		64
 
 static void __init scepter_gsm_init(void)
 {
@@ -587,7 +447,8 @@ static void __init scepter_gsm_init(void)
 		r = gpio_get_value(GSM_HWR);
 		if (r  == 0) break;
 	}
-	/*Note - ericsson integrators guide '2/1553-KRD 131 24 Uen Rev A'
+	/*
+	 * Note - ericsson integrators guide '2/1553-KRD 131 24 Uen Rev A'
 	 * indicates that POWER_ON (GSM_3304_ON_N) should be negated within
 	 * 10 seconds of HW_READY (GSM_HWR_N) being asserted or else
 	 * the module will enter an uncontrolled shutdown.  However,
@@ -596,8 +457,8 @@ static void __init scepter_gsm_init(void)
 	 */
 
 	/* TODO the board comes up with POWER_ON assertedd.
-	 * A period of time with POWER_ON negated may be necessary but this has not been
-	 * tested.
+	 * A period of time with POWER_ON negated may be necessary
+	 * but this has not been tested.
 	 */
 	if (r != 0) {
 		printk(KERN_ERR "[GSM] initialization failed.\n");
@@ -607,19 +468,19 @@ static void __init scepter_gsm_init(void)
 	printk(KERN_INFO "GSM module successfully initialized [%d].\n", i);
 }
 
-#define USB_SPEED_GPIO 74
-#define USB_SOFTCON_GPIO 75
+#define USB_SPEED_GPIO		74
+#define USB_SOFTCON_GPIO	75
 
 static void __init scepter_cpu_usb_init(void)
 {
 	int r;
 	int gpio = USB_SPEED_GPIO;
 
-  printk("Setting USB speed ...\n");
+	printk("Setting USB speed ...\n");
 	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
 	r = gpio_request(gpio, "usb-speed");
 	if (r < 0) {
-		printk(KERN_ERR "failed to request GPIO#%d\n", gpio);
+		printk(KERN_ERR "Failed to request GPIO#%d\n", gpio);
 		return;
 	}
 	gpio_direction_output(gpio, 1);
@@ -629,12 +490,94 @@ static void __init scepter_cpu_usb_init(void)
 	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
 	r = gpio_request(gpio, "usb-softcon");
 	if (r < 0) {
-		printk(KERN_ERR "failed to request GPIO#%d\n", gpio);
+		printk(KERN_ERR "Failed to request GPIO#%d\n", gpio);
 		return;
 	}
 	gpio_direction_output(gpio, 1);
 	gpio_set_value(gpio, 1);
 	gpio_export(gpio,0);
+}
+
+#define TPS65910_DEVCTRL_REG	0x3F
+#define TPS65910_I2C_ADDRESS	0x2D
+
+static int tps65910_read_reg(struct i2c_adapter *adapter, u8 addr)
+{
+	struct i2c_msg msg[2];
+	u8 data[2];
+	int ret;
+
+	msg[0].addr = TPS65910_I2C_ADDRESS;
+	msg[0].flags = 0;
+	msg[0].len = 1;
+	data[0] = addr;
+	msg[0].buf = data;
+	msg[1].addr = TPS65910_I2C_ADDRESS;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 1;
+	msg[1].buf = data;
+
+	ret = i2c_transfer(adapter, msg, 2);
+	if (ret < 0)
+		return ret;
+	else
+		return data[0];
+}
+
+static int tps65910_write_reg(struct i2c_adapter *adapter, u8 addr, u8 val)
+{
+	struct i2c_msg msg[1];
+	u8 data[2];
+	int ret;
+
+	msg[0].addr = TPS65910_I2C_ADDRESS;
+	msg[0].flags = 0;
+	msg[0].len = 2;
+	data[0] = addr;
+	data[1] = val;
+	msg[0].buf = data;
+
+	ret = i2c_transfer(adapter, msg, 1);
+	if (ret < 0)
+		return ret;
+	else
+		return data[0];
+}
+
+
+static void __init scepter_pmic_init(void)
+{
+	struct i2c_adapter *adapter;
+	int reg;
+
+	adapter = i2c_get_adapter(1);
+	if (adapter == NULL) {
+		printk(KERN_ERR "I2C adapter[1] is not available ?!\n");
+		return -1;
+	}
+
+	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);
+	if (reg < 0) {
+		printk(KERN_ERR "I2C failed to read DEVCTRL_REG ?!\n");
+	} else {
+		printk("[tps65910] DEVCTRL_REG=0x%x\n", reg);
+	}
+
+	tps65910_write_reg(adapter, TPS65910_DEVCTRL_REG, 0x40);
+	if (reg < 0) {
+		printk(KERN_ERR "I2C failed to write DEVCTRL_REG ?!\n");
+	} else {
+		printk("[tps65910] DEVCTRL_REG=0x%x\n", reg);
+	}
+
+	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);
+	if (reg < 0) {
+		printk(KERN_ERR "I2C failed to read DEVCTRL_REG ?!\n");
+	} else {
+		printk("[tps65910] Post DEVCTRL_REG=0x%x\n", reg);
+	}
+
+	i2c_put_adapter(adapter);
 }
 
 static void __init scepter_init(void)
@@ -656,8 +599,9 @@ static void __init scepter_init(void)
 
 	scepter_ethernet_init(&scepter_emac_pdata);
 
-	i2c_register_board_info(1, am3517evm_i2c1_boardinfo,
-				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
+	i2c_register_board_info(1, scepter_i2c1_boardinfo,
+				ARRAY_SIZE(scepter_i2c1_boardinfo));
+
 	/* MMC init function */
 	omap2_hsmmc_init(mmc);
 
@@ -665,6 +609,7 @@ static void __init scepter_init(void)
         omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 67);
         omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 68);
         omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 69);
+	scepter_pmic_init();
 }
 
 static void __init scepter_map_io(void)

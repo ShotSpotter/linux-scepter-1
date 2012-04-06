@@ -16,6 +16,9 @@ config ARCH_OMAP3430
 	depends on ARCH_OMAP3
 	select ARCH_OMAP_OTG
 
+config ARCH_AM3517
+	bool
+	
 config OMAP_PACKAGE_CBC
        bool
 
@@ -83,12 +86,13 @@ config MACH_OMAP3517EVM
 	bool "OMAP3517/ AM3517 EVM board"
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
-
+	select ARCH_AM3517
+	
 config MACH_SCEPTER
 	bool "AM3517 Scepter board"
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
-
+	select ARCH_AM3517
 
 config MACH_OMAP3_PANDORA
 	bool "OMAP3 Pandora"

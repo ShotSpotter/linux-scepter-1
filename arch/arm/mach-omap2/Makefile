@@ -67,7 +67,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o voltage.o
 obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o voltage.o \
 					   cpuidle34xx.o pm_bus.o
-ifeq ($(CONFIG_MACH_OMAP3517EVM),y)
+ifeq ($(CONFIG_ARCH_AM3517),y)
 obj-$(CONFIG_ARCH_OMAP3)		+= sleep3517.o
 else
 obj-$(CONFIG_ARCH_OMAP3)		+= sleep34xx.o

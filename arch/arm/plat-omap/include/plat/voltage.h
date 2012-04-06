@@ -53,8 +53,6 @@ struct voltagedomain {
 	char *name;
 };
 
-/* API to get the voltagedomain pointer */
-struct voltagedomain *omap_voltage_domain_lookup(char *name);
 
 /**
  * struct omap_volt_data - Omap voltage specific data.
@@ -115,6 +113,8 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
 unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm);
 struct dentry *omap_voltage_get_dbgdir(struct voltagedomain *voltdm);
 #ifdef CONFIG_PM
+/* API to get the voltagedomain pointer */
+struct voltagedomain *omap_voltage_domain_lookup(char *name);
 int omap_voltage_register_pmic(struct voltagedomain *voltdm,
 		struct omap_volt_pmic_info *pmic_info);
 void omap_change_voltscale_method(struct voltagedomain *voltdm,
@@ -125,10 +125,22 @@ int omap_voltage_add_request(struct voltagedomain *voltdm, struct device *dev,
 int omap_voltage_add_dev(struct voltagedomain *voltdm, struct device *dev);
 int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt);
 #else
+#include <linux/errno.h>
+/* API to get the voltagedomain pointer */
+static inline struct voltagedomain *omap_voltage_domain_lookup(char *name)
+{
+	return NULL;
+}
+
 static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
-		struct omap_volt_pmic_info *pmic_info) {}
+		struct omap_volt_pmic_info *pmic_info)
+{
+	return -EINVAL;
+}
 static inline  void omap_change_voltscale_method(struct voltagedomain *voltdm,
-		int voltscale_method) {}
+		int voltscale_method)
+{
+}
 static inline int omap_voltage_late_init(void)
 {
 	return -EINVAL;

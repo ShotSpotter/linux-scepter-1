@@ -617,11 +617,8 @@ static void __init scepter_map_io(void)
 	omap2_set_globals_343x();
 	omap34xx_map_common_io();
 }
-#if 0
+
 MACHINE_START(SCEPTER, "Scepter Board")
-#else
-MACHINE_START(OMAP3517EVM, "Scepter Board")
-#endif
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,

@@ -1667,7 +1667,7 @@ static struct clk mcspi1_fck = {
 };
 
 /* Per AM3517 TRM */
-static struct clk uart4_fck = {
+static struct clk uart4_fck_am35xx = {
 	.name		= "uart4_fck",
 	.ops		= &clkops_omap2_dflt_wait,
 	.parent		= &core_48m_fck,
@@ -3375,7 +3375,6 @@ static struct omap_clk omap3xxx_clks[] = {
 	CLK("omap2_mcspi.3", "fck",	&mcspi3_fck,	CK_3XXX),
 	CLK("omap2_mcspi.2", "fck",	&mcspi2_fck,	CK_3XXX),
 	CLK("omap2_mcspi.1", "fck",	&mcspi1_fck,	CK_3XXX),
-	CLK(NULL,	"uart4_fck",	&uart4_fck,	CK_3XXX),
 	CLK(NULL,	"uart2_fck",	&uart2_fck,	CK_3XXX),
 	CLK(NULL,	"uart1_fck",	&uart1_fck,	CK_3XXX),
 	CLK(NULL,	"fshostusb_fck", &fshostusb_fck, CK_3430ES1),
@@ -3519,6 +3518,7 @@ static struct omap_clk omap3xxx_clks[] = {
 	CLK("musb_hdrc",	"fck",		&hsotgusb_fck_am35xx,	CK_AM35XX),
 	CLK(NULL,	"hecc_ck",	&hecc_ck,	CK_AM35XX),
 	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
+	CLK(NULL,	"uart4_fck",	&uart4_fck_am35xx,	CK_AM35XX),
 };
 
 

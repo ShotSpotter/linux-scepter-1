@@ -95,7 +95,7 @@ static struct omap_nand_platform_data scepter_nand_data = {
 	.dev_ready      = NULL,
 };
 
-void __init scepter_flash_init(void)
+static void __init scepter_flash_init(void)
 {
 	u8 cs = 0;
 	u8 nandcs = GPMC_CS_NUM + 1;
@@ -262,7 +262,7 @@ static void am3517_disable_ethernet_int(void)
 	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
 }
 
-void scepter_ethernet_init(struct emac_platform_data *pdata)
+static void scepter_ethernet_init(struct emac_platform_data *pdata)
 {
 	u32 regval;
 

@@ -43,6 +43,13 @@
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
 
+#include <sound/wm8737.h>
+#include <plat/wm8737-sync.h>
+#include <sound/soc-dai.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/wm8737-mvdd-regulator.h>
+#include <linux/regulator/fixed.h>
+
 #include <plat/mcspi.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/mcp3001.h>
@@ -288,11 +295,72 @@ static void scepter_ethernet_init(struct emac_platform_data *pdata)
 
 /* TPS65023 specific initialization */
 
+
+static struct wm8737_platform_data scepter_wm8737_data[] = {
+		{
+				.id = 0,
+		},
+		{
+				.id = 1,
+		}
+};
+
+static struct wm8737_omap_data scepter_wm8737_master =
+{
+		.wm8737_id = 0,
+		.mcbsp_id = 0,
+		.codec_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+		.cpu_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+};
+
+static struct wm8737_omap_data scepter_wm8737_slaves[] =
+{
+		{
+				.wm8737_id = 1,
+				.mcbsp_id = 1,
+				.codec_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+				.cpu_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+		}
+};
+
+static struct wm8737_sync_platform_data scepter_wm8737_sync_data = {
+		.sample_cnt_rst_gpio = 84,
+		.mclk_en_gpio = 106,
+		.mclk = 12288000,
+		.master = &scepter_wm8737_master,
+		.slaves = scepter_wm8737_slaves,
+		.num_slaves = ARRAY_SIZE(scepter_wm8737_slaves),
+};
+
+static struct platform_device scepter_wm8737_sync = {
+		.name = "wm8737-sync",
+		.id = -2,
+		.dev = {
+			.platform_data = &scepter_wm8737_sync_data,
+		},
+};
+
+static struct platform_device generic_soc_slave = {
+		.name = "asoc-slave-codec",
+		.id = -1,
+};
+
 #define TPS65910_I2C_ADDRESS 0x2D
 static struct i2c_board_info __initdata scepter_i2c1_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tps65910", TPS65910_I2C_ADDRESS),
 	},
+};
+
+static struct i2c_board_info __initdata scepter_i2c2_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("wm8737",0x1A),
+		.platform_data = &(scepter_wm8737_data[0]),
+	},
+	{
+		I2C_BOARD_INFO("wm8737",0x1B),
+		.platform_data = &(scepter_wm8737_data[1]),
+	}
 };
 
 static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
@@ -304,6 +372,8 @@ static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 static int __init scepter_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 200, NULL, 0);
+	omap_register_i2c_bus(2, 400, scepter_i2c2_boardinfo,
+			ARRAY_SIZE(scepter_i2c2_boardinfo));
 	omap_register_i2c_bus(3, 400, scepter_i2c3_boardinfo,
 			ARRAY_SIZE(scepter_i2c3_boardinfo));
 
@@ -318,6 +388,8 @@ static struct omap_board_config_kernel scepter_config[] __initdata = {
 
 static struct platform_device *scepter_devices[] __initdata = {
 	&leds_gpio,
+	&scepter_wm8737_sync,
+	&generic_soc_slave,
 };
 
 static void __init scepter_init_irq(void)

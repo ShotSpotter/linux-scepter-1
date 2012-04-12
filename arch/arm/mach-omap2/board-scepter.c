@@ -295,6 +295,99 @@ static void scepter_ethernet_init(struct emac_platform_data *pdata)
 
 /* TPS65023 specific initialization */
 
+static struct regulator_consumer_supply scepter_wm8737_vdd_supplies[] = {
+		REGULATOR_SUPPLY("DCVDD","2-001a"),
+		REGULATOR_SUPPLY("DCVDD","2-001b"),
+		REGULATOR_SUPPLY("DBVDD","2-001a"),
+		REGULATOR_SUPPLY("DBVDD","2-001b"),
+		REGULATOR_SUPPLY("AVDD","2-001a"),
+		REGULATOR_SUPPLY("AVDD","2-001b"),
+};
+
+static struct regulator_init_data wm8737_vdd_initdata = {
+	.consumer_supplies = scepter_wm8737_vdd_supplies,
+	.num_consumer_supplies = ARRAY_SIZE(scepter_wm8737_vdd_supplies),
+	.constraints = {
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+};
+
+static struct fixed_voltage_config scepter_wm8737_vdd_config = {
+	.supply_name		= "wm8737-vdd",
+	.microvolts		= 330000000,
+	.gpio			= 128,
+	.enable_high		= 1,
+	.enabled_at_boot	= 0,
+	.init_data		= &wm8737_vdd_initdata,
+};
+
+static struct platform_device scepter_wm8737_vdd_device = {
+	.name = "reg-fixed-voltage",
+	.id = 2,
+	.dev	= {
+		.platform_data = &scepter_wm8737_vdd_config,
+	},
+};
+
+static struct regulator_consumer_supply scepter_wm8737_mvdd_supply[] = {
+		REGULATOR_SUPPLY("MVDD","2-001a"),
+		REGULATOR_SUPPLY("MVDD","2-001b"),
+};
+
+static struct regulator_init_data wm8737_mvdd_initdata[] = {
+		{
+#if 0
+				/*supply_regulator_dev is the correct relationship but it is broken.*/
+				.supply_regulator_dev = &scepter_wm8737_vdd_device.dev,
+#endif
+				.consumer_supplies = &scepter_wm8737_mvdd_supply[0],
+				.num_consumer_supplies = 1,
+				.constraints = {
+						.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+						REGULATOR_CHANGE_STATUS,
+				},
+		},
+		{
+#if 0
+				.supply_regulator_dev = &scepter_wm8737_vdd_device.dev,
+#endif
+				.consumer_supplies = &scepter_wm8737_mvdd_supply[1],
+				.num_consumer_supplies = 1,
+				.constraints = {
+						.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+						REGULATOR_CHANGE_STATUS,
+				},
+		},
+};
+
+static struct wm8737_mvdd_config scepter_wm8737_mvdd_config[] =
+{
+		{
+				.avdd_mV = 2800,
+				.init_data		= &wm8737_mvdd_initdata[0],
+		},
+		{
+				.avdd_mV = 2800,
+				.init_data		= &wm8737_mvdd_initdata[1],
+		}
+};
+
+static struct platform_device scepter_wm8737_mvdd_device[] = {
+		{
+				.name = "wm8737-mvdd-reg",
+				.id = 0,
+				.dev	= {
+						.platform_data = &scepter_wm8737_mvdd_config[0],
+				},
+		},
+		{
+				.name = "wm8737-mvdd-reg",
+				.id = 1,
+				.dev	= {
+						.platform_data = &scepter_wm8737_mvdd_config[1],
+				},
+		},
+};
 
 static struct wm8737_platform_data scepter_wm8737_data[] = {
 		{
@@ -390,6 +483,9 @@ static struct platform_device *scepter_devices[] __initdata = {
 	&leds_gpio,
 	&scepter_wm8737_sync,
 	&generic_soc_slave,
+	&scepter_wm8737_vdd_device,
+	&scepter_wm8737_mvdd_device[0],
+	&scepter_wm8737_mvdd_device[1]
 };
 
 static void __init scepter_init_irq(void)

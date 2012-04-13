@@ -1,5 +1,5 @@
 /*
- * wm8737-mvdd-regulator.c
+ * wm8737-micbias-regulator.c
  *
  * Copyright 2012 ShotSpotter Inc.
  *
@@ -28,23 +28,29 @@
 #include <sound/soc.h>
 /*TODO DO NOT WANT to reimplement soc i2c functions like other people
  */
-#include <linux/regulator/wm8737-mvdd-regulator.h>
+#include <linux/regulator/wm8737-micbias-regulator.h>
 #include "../../sound/soc/codecs/wm8737.h"
 #include <linux/regulator/machine.h>
 
-struct wm8737_mvdd_data {
+#define NUM_MICBIAS_LVL 4
+
+struct wm8737_micbias_data {
 	struct regulator_desc desc;
 	struct regulator_dev *rdev;
 	int micbias_cached;
 	int enabled;
 	struct snd_soc_dai *dai;
+	/*TODO pull avdd from supply regulator*/
 	int avdd_mV; //Only support one value for now
+	int mvdd_mV;
 	struct mutex mutex;
+	int micbias_level_uV[NUM_MICBIAS_LVL];
 };
 
-#define NUM_MICBIAS_LVL 4
 
-const static int avdd_multiplier[NUM_MICBIAS_LVL] =
+const static int AVDD_UNITY_MULTIPLIER = 1000;
+const static int MVDD_OFFSET_MV = 170;
+const static int AVDD_MULTIPLIER[NUM_MICBIAS_LVL] =
 {
 		0,
 		750,
@@ -52,16 +58,16 @@ const static int avdd_multiplier[NUM_MICBIAS_LVL] =
 		1200
 };
 
-static int wm8737_mvdd_is_enabled(struct regulator_dev *rdev)
+static int wm8737_micbias_is_enabled(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 
 	return data->enabled;
 }
 
-static int wm8737_mvdd_enable(struct regulator_dev *rdev)
+static int wm8737_micbias_enable(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
 	int ret = 0;
@@ -84,9 +90,9 @@ out:
 	return ret;
 }
 
-static int wm8737_mvdd_disable(struct regulator_dev *rdev)
+static int wm8737_micbias_disable(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
 	int ret = 0;
@@ -111,20 +117,20 @@ out:
 }
 
 
-static int wm8737_mvdd_get_voltage(struct regulator_dev *rdev)
+static int wm8737_micbias_get_voltage(struct regulator_dev *rdev)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 	int ret;
 	mutex_lock(&data->mutex);
-	ret = data->avdd_mV * avdd_multiplier[data->micbias_cached];
+	ret = data->micbias_level_uV[data->micbias_cached];
 	mutex_unlock(&data->mutex);
 	return ret;
 }
 
 static int
-wm8737_mvdd_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
+wm8737_micbias_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 	struct snd_soc_dai *dai = data->dai;
 	struct snd_soc_codec *codec	= dai->codec;
 	int vsel;
@@ -133,7 +139,7 @@ wm8737_mvdd_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
 		return -ENXIO;
 
 	for(vsel = 0; vsel < NUM_MICBIAS_LVL; vsel++) {
-		int val_uV = data->avdd_mV * avdd_multiplier[vsel];
+		int val_uV = data->micbias_level_uV[vsel];
 
 		if(val_uV == min_uV)
 			break;
@@ -158,27 +164,27 @@ wm8737_mvdd_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
 	return 0;
 }
 
-static int wm8737_mvdd_list_voltage(struct regulator_dev *rdev,
+static int wm8737_micbias_list_voltage(struct regulator_dev *rdev,
 				      unsigned selector)
 {
-	struct wm8737_mvdd_data *data = rdev_get_drvdata(rdev);
+	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
 
 	if(selector >= NUM_MICBIAS_LVL)
 		return -EINVAL;
 
-	return data->avdd_mV * avdd_multiplier[selector];
+	return data->micbias_level_uV[selector];
 }
 
-static struct regulator_ops wm8737_mvdd_ops = {
-	.is_enabled = wm8737_mvdd_is_enabled,
-	.enable = wm8737_mvdd_enable,
-	.disable = wm8737_mvdd_disable,
-	.get_voltage = wm8737_mvdd_get_voltage,
-	.set_voltage = wm8737_mvdd_set_voltage,
-	.list_voltage = wm8737_mvdd_list_voltage,
+static struct regulator_ops wm8737_micbias_ops = {
+	.is_enabled = wm8737_micbias_is_enabled,
+	.enable = wm8737_micbias_enable,
+	.disable = wm8737_micbias_disable,
+	.get_voltage = wm8737_micbias_get_voltage,
+	.set_voltage = wm8737_micbias_set_voltage,
+	.list_voltage = wm8737_micbias_list_voltage,
 };
 
-static ssize_t mvdd_voltage_available(struct device *dev,
+static ssize_t micbias_voltage_available(struct device *dev,
 			  struct device_attribute *attr, char *buf)
 {
 	struct regulator_dev *rdev = dev_get_drvdata(dev);
@@ -186,7 +192,7 @@ static ssize_t mvdd_voltage_available(struct device *dev,
 	int i;
 
 	for(i=0; value >= 0; i++) {
-		value = wm8737_mvdd_list_voltage(rdev,i);
+		value = wm8737_micbias_list_voltage(rdev,i);
 		if(value >= 0)
 			len += sprintf(buf+len,"%d\n",value);
 	}
@@ -195,7 +201,7 @@ static ssize_t mvdd_voltage_available(struct device *dev,
 }
 
 
-static ssize_t mvdd_voltage_store(struct device *dev,
+static ssize_t micbias_voltage_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct regulator_dev *rdev = dev_get_drvdata(dev);
@@ -205,7 +211,7 @@ static ssize_t mvdd_voltage_store(struct device *dev,
 	status = strict_strtol(buf, 0, &value);
 
 	if (status == 0)
-		status = wm8737_mvdd_set_voltage(rdev,value,value);
+		status = wm8737_micbias_set_voltage(rdev,value,value);
 
 	if(status == 0)
 		status = size;
@@ -214,20 +220,21 @@ static ssize_t mvdd_voltage_store(struct device *dev,
 }
 
 static const DEVICE_ATTR(microvolts_set, 0200,
-		NULL, mvdd_voltage_store);
+		NULL, micbias_voltage_store);
 
 static const DEVICE_ATTR(microvolts_available, 0444,
-		mvdd_voltage_available, NULL);
+		micbias_voltage_available, NULL);
 
 
-static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
+static int __devinit wm8737_micbias_probe(struct platform_device *pdev)
 {
-	struct wm8737_mvdd_config *config = pdev->dev.platform_data;
-	struct wm8737_mvdd_data *drvdata;
+	struct wm8737_micbias_config *config = pdev->dev.platform_data;
+	struct wm8737_micbias_data *drvdata;
 	const int NAME_SZ = 32;
 	char *name;
 	int ret;
 	int id;
+	int i;
 
 	if(pdev->id > MAX_WM8737_ID) {
 		dev_err(&pdev->dev, "Invalid wm8737 ID of %d\n",pdev->id);
@@ -239,7 +246,7 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 	else
 		id = pdev->id;
 
-	drvdata = kzalloc(sizeof(struct wm8737_mvdd_data), GFP_KERNEL);
+	drvdata = kzalloc(sizeof(struct wm8737_micbias_data), GFP_KERNEL);
 	if (drvdata == NULL) {
 		dev_err(&pdev->dev, "Failed to allocate device data\n");
 		ret = -ENOMEM;
@@ -253,13 +260,13 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 		goto err_drvdata;
 	}
 
-	snprintf(name,NAME_SZ,"wm8737-mvdd-reg-%d",id);
+	snprintf(name,NAME_SZ,"wm8737-micbias-reg-%d",id);
 	name[NAME_SZ-1] = '\0';
 	drvdata->desc.name = name;
 
 	drvdata->desc.type = REGULATOR_VOLTAGE;
 	drvdata->desc.owner = THIS_MODULE;
-	drvdata->desc.ops = &wm8737_mvdd_ops;
+	drvdata->desc.ops = &wm8737_micbias_ops;
 	drvdata->desc.n_voltages = NUM_MICBIAS_LVL;
 
 	drvdata->micbias_cached = 0;
@@ -267,8 +274,16 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 
 	drvdata->enabled = 0;
 	drvdata->avdd_mV = config->avdd_mV;
+	drvdata->mvdd_mV = config->mvdd_mV;
+	for(i = 0; i < NUM_MICBIAS_LVL; i++) {
+		int tmp = config->avdd_mV * AVDD_MULTIPLIER[i];
+		if(tmp > (config->mvdd_mV-MVDD_OFFSET_MV)*AVDD_UNITY_MULTIPLIER)
+			tmp  = (config->mvdd_mV-MVDD_OFFSET_MV)*AVDD_UNITY_MULTIPLIER;
+		drvdata->micbias_level_uV[i] = tmp;
+	}
+
 	config->init_data->constraints.min_uV = 1;
-	config->init_data->constraints.max_uV = config->avdd_mV * avdd_multiplier[NUM_MICBIAS_LVL-1];
+	config->init_data->constraints.max_uV = drvdata->micbias_level_uV[NUM_MICBIAS_LVL-1];
 
 	mutex_init(&drvdata->mutex);
 
@@ -303,9 +318,9 @@ err_drvdata:
 	return ret;
 }
 
-static int __devexit wm8737_mvdd_remove(struct platform_device *pdev)
+static int __devexit wm8737_micbias_remove(struct platform_device *pdev)
 {
-	struct wm8737_mvdd_data *drvdata = platform_get_drvdata(pdev);
+	struct wm8737_micbias_data *drvdata = platform_get_drvdata(pdev);
 
 	regulator_unregister(drvdata->rdev);
 	kfree(drvdata->desc.name);
@@ -314,27 +329,27 @@ static int __devexit wm8737_mvdd_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_driver wm8737_mvdd_regulator_voltage_driver = {
-	.probe		= wm8737_mvdd_probe,
-	.remove		= __devexit_p(wm8737_mvdd_remove),
+static struct platform_driver wm8737_micbias_regulator_voltage_driver = {
+	.probe		= wm8737_micbias_probe,
+	.remove		= __devexit_p(wm8737_micbias_remove),
 	.driver		= {
-		.name		= "wm8737-mvdd-reg",
+		.name		= "wm8737-micbias-reg",
 		.owner		= THIS_MODULE,
 	},
 };
 
-static int __init wm8737_mvdd_regulator_voltage_init(void)
+static int __init wm8737_micbias_regulator_voltage_init(void)
 {
-	return platform_driver_register(&wm8737_mvdd_regulator_voltage_driver);
+	return platform_driver_register(&wm8737_micbias_regulator_voltage_driver);
 }
-subsys_initcall(wm8737_mvdd_regulator_voltage_init);
+subsys_initcall(wm8737_micbias_regulator_voltage_init);
 
-static void __exit wm8737_mvdd_regulator_voltage_exit(void)
+static void __exit wm8737_micbias_regulator_voltage_exit(void)
 {
-	platform_driver_unregister(&wm8737_mvdd_regulator_voltage_driver);
+	platform_driver_unregister(&wm8737_micbias_regulator_voltage_driver);
 }
-module_exit(wm8737_mvdd_regulator_voltage_exit);
+module_exit(wm8737_micbias_regulator_voltage_exit);
 
 MODULE_AUTHOR("Sarah Newman <snewman@shotspotter.com>");
-MODULE_DESCRIPTION("wm8737 mvdd voltage driver");
+MODULE_DESCRIPTION("wm8737 micbias voltage driver");
 MODULE_LICENSE("GPL");

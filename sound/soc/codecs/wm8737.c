@@ -39,12 +39,13 @@ static struct snd_soc_codec *wm8737_codec[MAX_WM8737_CNT];
 
 struct snd_soc_codec_device soc_codec_dev_wm8737;
 
-#define WM8737_NUM_SUPPLIES 4
+#define WM8737_NUM_SUPPLIES 5
 static const char *wm8737_supply_names[WM8737_NUM_SUPPLIES] = {
 	"DCVDD",
 	"DBVDD",
 	"AVDD",
 	"MVDD",
+	"MICBIAS"
 };
 
 /* codec private data */
@@ -93,15 +94,15 @@ static const DECLARE_TLV_DB_SCALE(ng_tlv, -7800, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_max_tlv, -1200, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_target_tlv, -1800, 100, 0);
 
-static const char *micbias_enum_text[] = {
+static const char *mic_preamp_bias_enum_text[] = {
 	"25%",
 	"50%",
 	"75%",
 	"100%",
 };
 
-static const struct soc_enum micbias_enum =
-	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 0, 4, micbias_enum_text);
+static const struct soc_enum mic_preamp_bias_enum =
+	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 0, 4, mic_preamp_bias_enum_text);
 
 static const char *low_cutoff_text[] = {
 	"Low", "High"
@@ -164,7 +165,7 @@ SOC_DOUBLE("Capture ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
 
 SOC_DOUBLE("INPUT1 DC Bias Switch", WM8737_MISC_BIAS_CONTROL, 0, 1, 1, 0),
 
-SOC_ENUM("Mic PGA Bias", micbias_enum),
+SOC_ENUM("Mic PGA Bias", mic_preamp_bias_enum),
 SOC_SINGLE("ADC Low Power Switch", WM8737_ADC_CONTROL, 2, 1, 0),
 SOC_SINGLE("High Pass Filter Switch", WM8737_ADC_CONTROL, 0, 1, 1),
 SOC_DOUBLE("Polarity Invert Switch", WM8737_ADC_CONTROL, 5, 6, 1, 0),

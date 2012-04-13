@@ -1,12 +1,11 @@
 /*
- * fixed.h
+ * wm8737-micbias-regulator.h
  *
- * Copyright 2008 Wolfson Microelectronics PLC.
+ * Copyright 2012 ShotSpotter Inc.
  *
- * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
+ * Author: Sarah Newman <snewman@shotspotter.com>
  *
- * Copyright (c) 2009 Nokia Corporation
- * Roger Quadros <ext-roger.quadros@nokia.com>
+ * Based off of fixed.h by Mark Brown
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -14,13 +13,14 @@
  * License, or (at your option) any later version.
  */
 
-#ifndef __REGULATOR_WM8737_MVDD_H
-#define __REGULATOR_WM8737_MVDD_H
+#ifndef __REGULATOR_WM8737_MICBIAS_H
+#define __REGULATOR_WM8737_MICBIAS_H
 
 struct regulator_init_data;
 
-struct wm8737_mvdd_config {
+struct wm8737_micbias_config {
 	int avdd_mV;
+	int mvdd_mV;
 	struct regulator_init_data *init_data;
 };
 

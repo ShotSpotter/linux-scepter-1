@@ -201,8 +201,8 @@ config REGULATOR_88PM8607
 	help
 	  This driver supports 88PM8607 voltage regulator chips.
 
-config REGULATOR_WM8737_MVDD
-	tristate "wm8737 mvdd regulator"
+config REGULATOR_WM8737_MICBIAS
+	tristate "wm8737 micbias regulator"
 	depends on SND_SOC_WM8737		
 endif
 

@@ -178,6 +178,23 @@ static struct regulator_ops wm8737_mvdd_ops = {
 	.list_voltage = wm8737_mvdd_list_voltage,
 };
 
+static ssize_t mvdd_voltage_available(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	int value = 0, len = 0;
+	int i;
+
+	for(i=0; value >= 0; i++) {
+		value = wm8737_mvdd_list_voltage(rdev,i);
+		if(value >= 0)
+			len += sprintf(buf+len,"%d\n",value);
+	}
+
+	return len;
+}
+
+
 static ssize_t mvdd_voltage_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
@@ -198,6 +215,9 @@ static ssize_t mvdd_voltage_store(struct device *dev,
 
 static const DEVICE_ATTR(microvolts_set, 0200,
 		NULL, mvdd_voltage_store);
+
+static const DEVICE_ATTR(microvolts_available, 0444,
+		mvdd_voltage_available, NULL);
 
 
 static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
@@ -262,6 +282,10 @@ static int __devinit wm8737_mvdd_probe(struct platform_device *pdev)
 	}
 
 	ret = device_create_file(&drvdata->rdev->dev, &dev_attr_microvolts_set);
+	if (ret < 0)
+		goto err_regulator;
+
+	ret = device_create_file(&drvdata->rdev->dev, &dev_attr_microvolts_available);
 	if (ret < 0)
 		goto err_regulator;
 

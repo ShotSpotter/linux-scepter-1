@@ -317,6 +317,7 @@ static struct fixed_voltage_config scepter_wm8737_dvdd_config = {
 	.gpio			= 128,
 	.enable_high		= 1,
 	.enabled_at_boot	= 0,
+	.startup_delay = 50000,
 	.init_data		= &wm8737_dvdd_initdata,
 };
 

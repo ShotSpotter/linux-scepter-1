@@ -708,6 +708,19 @@
 #define TPS65910_GPIO_STS				BIT(1)
 #define TPS65910_GPIO_SET				BIT(0)
 
+
+/*
+ * Sleep keepon data: Maintains the state in sleep mode
+ * @therm_keepon: Keep on the thermal monitoring in sleep state.
+ * @clkout32k_keepon: Keep on the 32KHz clock output in sleep state.
+ * @i2chs_keepon: Keep on high speed internal clock in sleep state.
+ */
+struct tps65910_sleep_keepon_data {
+	unsigned therm_keepon:1;
+	unsigned clkout32k_keepon:1;
+	unsigned i2chs_keepon:1;
+};
+
 /**
  * struct tps65910_board
  * Board platform data may be used to initialize regulators.
@@ -716,6 +729,8 @@
 struct tps65910_board {
 	int gpio_base;
 	struct regulator_init_data *tps65910_pmic_init_data;
+	bool en_dev_slp;
+	struct tps65910_sleep_keepon_data *slp_keepon;
 };
 
 /**

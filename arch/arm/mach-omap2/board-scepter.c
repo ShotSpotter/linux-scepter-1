@@ -492,9 +492,16 @@ static struct i2c_board_info __initdata scepter_i2c2_boardinfo[] = {
 	}
 };
 
+static struct at24_platform_data scepter_eeprom = {
+	.byte_len = 8192,
+	.page_size = 32,
+	.flags = AT24_FLAG_ADDR16,
+};
+
 static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("24c64", 0x50),
+		.platform_data = &scepter_eeprom,
 	},
 };
 

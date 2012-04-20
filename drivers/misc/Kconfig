@@ -27,6 +27,14 @@ config CPLD
 	  If you say yes here, you get the CPLD driver with an associated
 	  /proc control interface.
 
+config HEATER
+	tristate "Heater driver for the Scepter board"
+	depends on MACH_SCEPTER
+	help
+	  If you say yes here, you get a sysfs interface capable of
+	  controlling the left and right heaters on the Scepter board.
+
+
 config AD525X_DPOT
 	tristate "Analog Devices AD525x Digital Potentiometers"
 	depends on I2C && SYSFS

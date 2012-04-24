@@ -44,10 +44,6 @@
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
 
-#include <plat/mcspi.h>
-#include <linux/spi/spi.h>
-#include <linux/spi/mcp3001.h>
-
 #include "hsmmc.h"
 #include "mux.h"
 
@@ -712,37 +708,6 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}      /* Terminator */
 };
 
-static struct omap2_mcspi_device_config mcp3001_mcspi_config = {
-  .turbo_mode = 0,
-  .single_channel = 1,
-};
-
-static struct mcp3001_platform_data mcp3001_config __initdata = {
-  .nvals = 32,
-};
-
-static struct spi_board_info am3517_evm_spi_board_info[] __initdata = {
-  {
-    .modalias      = "mcp3k1",
-    .bus_num       = 4,
-    .chip_select   = 0,
-    // 2.80MHz Vdd == 5V
-    // 1.05MHz Vdd == 2.7V
-    .max_speed_hz  = 1050000,
-    .controller_data = &mcp3001_mcspi_config,
-    .irq           = -1,
-    .platform_data = &mcp3001_config,
-  }
-};
-
-static void __init am3517_evm_spi_init(void)
-{
-  spi_register_board_info(am3517_evm_spi_board_info,
-			  ARRAY_SIZE(am3517_evm_spi_board_info));
-}
-
-
-
 static void __init am3517_evm_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
@@ -751,7 +716,6 @@ static void __init am3517_evm_init(void)
 	platform_add_devices(am3517_evm_devices,
 				ARRAY_SIZE(am3517_evm_devices));
 
-	am3517_evm_spi_init();
 	omap_serial_init();
 	am3517evm_flash_init();
 

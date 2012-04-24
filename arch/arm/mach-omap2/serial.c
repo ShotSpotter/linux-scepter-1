@@ -644,7 +644,6 @@ void __init omap_serial_early_init(void)
 
 
 	if (!(cpu_is_omap3630() || cpu_is_omap4430())) {
-		printk("HY-DBG: Setting up 4 uarts\n");
 		nr_ports = 4;
 	} else 	if (cpu_is_omap4430())
 		nr_ports = ARRAY_SIZE(omap_uart);
@@ -783,7 +782,6 @@ void __init omap_serial_init(void)
 
 	if (!(cpu_is_omap3630() || cpu_is_omap4430())) {
 		nr_ports = 4;
-		printk("HY-DBG: Setting up 4 uarts\n");
 	} else if (cpu_is_omap4430())
 		nr_ports = ARRAY_SIZE(omap_uart);
 	else

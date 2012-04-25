@@ -376,7 +376,9 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
 	if (cpu_is_omap24xx() || cpu_is_omap34xx())   /* FIXME: OMAP4 */
 		omap_hwmod_late_init(skip_setup_idle);
 
-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+	/* OMAP3517 and OMAP3505 use a EMIF instead of SDRC */
+	if ((cpu_is_omap24xx() || cpu_is_omap34xx()) && \
+		 !(cpu_is_omap3517() || cpu_is_omap3505())) {
 		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
 		_omap2_init_reprogram_sdrc();
 	}

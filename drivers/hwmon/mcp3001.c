@@ -25,6 +25,7 @@
 #include <linux/hwmon.h>
 #include <linux/gpio.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 #include <linux/spi/spi.h>
 
 #define DRVNAME  "mcp3k1"
@@ -45,15 +46,142 @@ struct mcp3k1 {
 // which sub-parameter we are querying.  set by writing sysfs.
 static int index;
 
+/* forward declarations */
+static int mcp3k1_attr_index(struct attribute *attr);
+static ssize_t mcp3k1_show(struct device *dev, struct device_attribute *attr,
+			   char *buf);
+static ssize_t mcp3k1_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count);
+
+static void __mcp3k1_store(int index) {
+	gpio_set_value(ADC_MUX_A0_GPIO, ((index & (1 << 0))?1:0));
+	gpio_set_value(ADC_MUX_A1_GPIO, ((index & (1 << 1))?1:0));
+	gpio_set_value(ADC_MUX_A2_GPIO, ((index & (1 << 2))?1:0));
+	gpio_set_value(ADC_MUX_A3_GPIO, ((index & (1 << 3))?1:0));
+	gpio_set_value(ADC_MUX_A4_GPIO, ((index & (1 << 4))?1:0));
+}
+
+static ssize_t mcp3k1_store(struct device *dev, struct device_attribute *attr,
+                           const char *buf, size_t count)
+{
+	int c;
+	c = sscanf(buf, "%du", &index);
+	if (c > 0) {
+		if (index >= 0 && index < (1 << 5)) {
+			__mcp3k1_store(index);
+		}
+	}
+	return count;
+}
+
+static DEVICE_ATTR(mcp3k1, 0666, mcp3k1_show, mcp3k1_store);
+
+static DEVICE_ATTR(00, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(01, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(02, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(03, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(04, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(05, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(06, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(07, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(08, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(09, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0a, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0b, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0c, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0d, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0e, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(0f, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(10, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(11, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(12, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(13, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(14, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(15, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(16, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(17, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(18, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(19, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1a, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1b, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1c, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1d, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1e, 0440, mcp3k1_show, NULL);
+static DEVICE_ATTR(1f, 0440, mcp3k1_show, NULL);
+
+static const struct attribute *mcp3k1_attrs[] = {
+	&dev_attr_00.attr,
+	&dev_attr_01.attr,
+	&dev_attr_02.attr,
+	&dev_attr_03.attr,
+	&dev_attr_04.attr,
+	&dev_attr_05.attr,
+	&dev_attr_06.attr,
+	&dev_attr_07.attr,
+	&dev_attr_08.attr,
+	&dev_attr_09.attr,
+	&dev_attr_0a.attr,
+	&dev_attr_0b.attr,
+	&dev_attr_0c.attr,
+	&dev_attr_0d.attr,
+	&dev_attr_0e.attr,
+	&dev_attr_0f.attr,
+	&dev_attr_10.attr,
+	&dev_attr_11.attr,
+	&dev_attr_12.attr,
+	&dev_attr_13.attr,
+	&dev_attr_14.attr,
+	&dev_attr_15.attr,
+	&dev_attr_16.attr,
+	&dev_attr_17.attr,
+	&dev_attr_18.attr,
+	&dev_attr_19.attr,
+	&dev_attr_1a.attr,
+	&dev_attr_1b.attr,
+	&dev_attr_1c.attr,
+	&dev_attr_1d.attr,
+	&dev_attr_1e.attr,
+	&dev_attr_1f.attr,
+	NULL,
+};
+
+static const struct attribute_group mcp3k1_attr_group = {
+	.attrs = (struct attribute **) mcp3k1_attrs,
+};
+
+
+static int mcp3k1_attr_index(struct attribute *attr)
+{
+	int i;
+	const struct attribute *p;
+
+	for (i = 0; (p = mcp3k1_attrs[i]) != NULL; i++) {
+		if (p == attr) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 static ssize_t mcp3k1_show(struct device *dev, struct device_attribute *attr,
 			   char *buf)
 {
 	struct mcp3k1 *p_mcp3k1 = dev_get_drvdata(dev);
-	u8 rxbuf[3]; 
-	int val = 0;
+	u8 rxbuf[3];
+	int val = 0, index;
 	int millivolt;
 
+        index = mcp3k1_attr_index(&attr->attr);
+        if (index < 0) {
+		dev_dbg(dev, "mcp3k1: invalid attribute index.\n");
+		return 0;
+        }
+
+	mutex_lock(&p_mcp3k1->lock);
+	__mcp3k1_store(index);
+	msleep(100);
 	spi_write_then_read(p_mcp3k1->spi, NULL, 0, rxbuf, 2);
+	mutex_unlock(&p_mcp3k1->lock);
 
 	val = ((rxbuf[0] & 0x1f) << 5) | ((rxbuf[1] & 0xf8) >> 3);
 #if 0
@@ -65,27 +193,6 @@ static ssize_t mcp3k1_show(struct device *dev, struct device_attribute *attr,
 #endif
 }
 
-static ssize_t mcp3k1_store(struct device *dev, struct device_attribute *attr,
-			    const char *buf, size_t count)
-{
-	int c;
-	c = sscanf(buf, "%du", &index);
-	if (c > 0) {
-		if (index >= 0 && index < (1 << 5)) {
-			gpio_set_value(ADC_MUX_A0_GPIO, ((index & (1 << 0))?1:0));
-			gpio_set_value(ADC_MUX_A1_GPIO, ((index & (1 << 1))?1:0));
-			gpio_set_value(ADC_MUX_A2_GPIO, ((index & (1 << 2))?1:0));
-			gpio_set_value(ADC_MUX_A3_GPIO, ((index & (1 << 3))?1:0));
-			gpio_set_value(ADC_MUX_A4_GPIO, ((index & (1 << 4))?1:0));
-		}
-	}
-	return count;
-}
-
-
-// creates dev_attr_mcp3k1
-static DEVICE_ATTR(mcp3k1, 0666, mcp3k1_show, mcp3k1_store);
-
 static int __devinit mcp3k1_probe(struct spi_device *spi)
 {
 	int status, err;
@@ -93,15 +200,16 @@ static int __devinit mcp3k1_probe(struct spi_device *spi)
 
 	// CS == AL and MSB first are defaults, and correct for mcp3k1
 	err = spi_setup(spi);
-	if (err < 0)
+	if (err < 0) {
 		return err;
+	}
 
 	p_mcp3k1 = kzalloc(sizeof *p_mcp3k1, GFP_KERNEL);
 	if (!p_mcp3k1)
 		return -ENOMEM;
-  
+
 	mutex_init(&p_mcp3k1->lock);
-  
+
 	p_mcp3k1->spi = spi;
 
 	err = gpio_request(ADC_MUX_ENABLE_GPIO, "ADC Enable");
@@ -165,10 +273,21 @@ static int __devinit mcp3k1_probe(struct spi_device *spi)
 
 	dev_set_drvdata(&spi->dev, p_mcp3k1);
 
+
 	status = device_create_file(&spi->dev, &dev_attr_mcp3k1);
 	if (status != 0) {
 		dev_dbg(&spi->dev, "mcp3k1: Device create file failed.\n");
 hwmon_reg_failed:
+		p_mcp3k1->spi = NULL;
+		dev_set_drvdata(&spi->dev, NULL);
+		kfree(p_mcp3k1);
+		return status;
+	}
+
+	status = sysfs_create_group(&spi->dev.kobj, &mcp3k1_attr_group);
+	if (status != 0) {
+		dev_dbg(&spi->dev, "mcp3k1: sysfs create group failed.\n");
+		hwmon_device_unregister(p_mcp3k1->hwmon_dev);
 		p_mcp3k1->spi = NULL;
 		dev_set_drvdata(&spi->dev, NULL);
 		kfree(p_mcp3k1);
@@ -180,6 +299,7 @@ static int __devexit mcp3k1_remove(struct spi_device *spi)
 {
 	struct mcp3k1 *p_mcp3k1 = dev_get_drvdata(&spi->dev);
 
+	sysfs_remove_group(&spi->dev.kobj, &mcp3k1_attr_group);
 	device_remove_file(&spi->dev, &dev_attr_mcp3k1);
 	hwmon_device_unregister(p_mcp3k1->hwmon_dev);
 	dev_set_drvdata(&spi->dev, NULL);

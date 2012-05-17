@@ -178,7 +178,7 @@ SOC_ENUM("Right ZC Timeout", zc_timeout_enum_r),
 
 SOC_DOUBLE("INPUT1 DC Bias Switch", WM8737_MISC_BIAS_CONTROL, 0, 1, 1, 0),
 
-SOC_ENUM("Mic PGA Bias", mic_preamp_bias_enum),
+SOC_ENUM("Mic Preamp Bias", mic_preamp_bias_enum),
 SOC_SINGLE("ADC Low Power Switch", WM8737_ADC_CONTROL, 2, 1, 0),
 SOC_SINGLE("High Pass Filter Switch", WM8737_ADC_CONTROL, 0, 1, 1),
 SOC_SINGLE("Update DC Offset Switch", WM8737_ADC_CONTROL, 4, 1, 0),

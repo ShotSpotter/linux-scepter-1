@@ -37,7 +37,7 @@
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
 
-#define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000)
+#define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000 | SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_KNOT)
 #define OMAP_MCBSP_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 #define OMAP_MCBSP_SOC_SINGLE_S16_EXT(xname, xmin, xmax, \
 	xhandler_get, xhandler_put) \
@@ -153,7 +153,8 @@ static const unsigned long omap34xx_mcbsp_port[][2] = {};
 static void omap_mcbsp_status_callback(int id, u32 status, void *data)
 {
 	struct snd_pcm_substream *substream = data; 
-	snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+		printk(KERN_ERR "%s: mcbsp %d got status %08x\n", __func__, id, status);
+		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
 }
 
 static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream)

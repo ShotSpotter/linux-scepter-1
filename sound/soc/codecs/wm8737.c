@@ -104,6 +104,16 @@ static const char *mic_preamp_bias_enum_text[] = {
 static const struct soc_enum mic_preamp_bias_enum =
 	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 0, 4, mic_preamp_bias_enum_text);
 
+static const char *zc_timeout_text[] = {
+		"256/fs", "512/fs","1024/fs","2048/fs",
+};
+
+static const struct soc_enum zc_timeout_enum_l =
+	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_L, 0, 4, zc_timeout_text);
+
+static const struct soc_enum zc_timeout_enum_r =
+	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_R, 0, 4, zc_timeout_text);
+
 static const char *low_cutoff_text[] = {
 	"Low", "High"
 };
@@ -163,11 +173,15 @@ SOC_DOUBLE_R_TLV("Capture Volume", WM8737_LEFT_PGA_VOLUME,
 SOC_DOUBLE_R("Capture ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
 	   2, 1, 0),
 
+SOC_ENUM("Left ZC Timeout", zc_timeout_enum_l),
+SOC_ENUM("Right ZC Timeout", zc_timeout_enum_r),
+
 SOC_DOUBLE("INPUT1 DC Bias Switch", WM8737_MISC_BIAS_CONTROL, 0, 1, 1, 0),
 
 SOC_ENUM("Mic PGA Bias", mic_preamp_bias_enum),
 SOC_SINGLE("ADC Low Power Switch", WM8737_ADC_CONTROL, 2, 1, 0),
 SOC_SINGLE("High Pass Filter Switch", WM8737_ADC_CONTROL, 0, 1, 1),
+SOC_SINGLE("Update DC Offset Switch", WM8737_ADC_CONTROL, 4, 1, 0),
 SOC_DOUBLE("Polarity Invert Switch", WM8737_ADC_CONTROL, 5, 6, 1, 0),
 
 SOC_SINGLE("3D Switch", WM8737_3D_ENHANCE, 0, 1, 0),

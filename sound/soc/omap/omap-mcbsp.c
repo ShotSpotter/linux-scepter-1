@@ -470,6 +470,11 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
+		regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_24);
+		regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_24);
+		regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_24);
+		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_24);
+		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		/* Set word lengths */
 		regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_32);

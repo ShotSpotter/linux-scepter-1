@@ -89,7 +89,7 @@ static const unsigned int micboost_tlv[] = {
 	3, 3, TLV_DB_SCALE_ITEM(3300, 0, 0),
 };
 static const DECLARE_TLV_DB_SCALE(pga_tlv, -9750, 50, 1);
-static const DECLARE_TLV_DB_SCALE(adc_tlv, -600, 600, 0);
+static const DECLARE_TLV_DB_SCALE(adc_tlv_3d, -600, 600, 0);
 static const DECLARE_TLV_DB_SCALE(ng_tlv, -7800, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_max_tlv, -1200, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_target_tlv, -1800, 100, 0);
@@ -114,19 +114,19 @@ static const struct soc_enum zc_timeout_enum_l =
 static const struct soc_enum zc_timeout_enum_r =
 	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_R, 0, 4, zc_timeout_text);
 
-static const char *low_cutoff_text[] = {
+static const char *low_3d_cutoff_text[] = {
 	"Low", "High"
 };
 
 static const struct soc_enum low_3d =
-	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 6, 2, low_cutoff_text);
+	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 6, 2, low_3d_cutoff_text);
 
-static const char *high_cutoff_text[] = {
+static const char *high_3d_cutoff_text[] = {
 	"High", "Low"
 };
 
 static const struct soc_enum high_3d =
-	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 5, 2, high_cutoff_text);
+	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 5, 2, high_3d_cutoff_text);
 
 static const char *alc_fn_text[] = {
 	"Disabled", "Right", "Left", "Stereo"
@@ -187,8 +187,8 @@ SOC_DOUBLE("Polarity Invert Switch", WM8737_ADC_CONTROL, 5, 6, 1, 0),
 SOC_SINGLE("3D Switch", WM8737_3D_ENHANCE, 0, 1, 0),
 SOC_SINGLE("3D Depth", WM8737_3D_ENHANCE, 1, 15, 0),
 SOC_ENUM("3D Low Cut-off", low_3d),
-SOC_ENUM("3D High Cut-off", low_3d),
-SOC_SINGLE_TLV("3D ADC Volume", WM8737_3D_ENHANCE, 7, 1, 1, adc_tlv),
+SOC_ENUM("3D High Cut-off", high_3d),
+SOC_SINGLE_TLV("3D ADC Volume", WM8737_3D_ENHANCE, 7, 1, 1, adc_tlv_3d),
 
 SOC_SINGLE("Noise Gate Switch", WM8737_NOISE_GATE, 0, 1, 0),
 SOC_SINGLE_TLV("Noise Gate Threshold Volume", WM8737_NOISE_GATE, 2, 7, 0,

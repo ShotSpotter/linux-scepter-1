@@ -418,6 +418,8 @@ static int wm8737_pcm_prepare(struct snd_pcm_substream *substream,
 
 	/* set active */
 	snd_soc_update_bits(codec,WM8737_AUDIO_FORMAT,WM8737_SDODIS_MASK,0 << WM8737_SDODIS_SHIFT);
+
+	/* TODO not sure if this is necessary given DAPM*/
 	snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,WM8737_AI_MASK,1 << WM8737_AI_SHIFT);
 
 	return 0;
@@ -434,6 +436,7 @@ static void wm8737_shutdown(struct snd_pcm_substream *substream,
 	if (!codec->active) {
 		udelay(50);
 		snd_soc_update_bits(codec,WM8737_AUDIO_FORMAT,WM8737_SDODIS_MASK,1 << WM8737_SDODIS_SHIFT);
+	/* TODO not sure if this is necessary given DAPM*/
 		snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,WM8737_AI_MASK,0 << WM8737_AI_SHIFT);
 	}
 }

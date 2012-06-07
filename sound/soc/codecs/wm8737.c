@@ -726,6 +726,9 @@ static int wm8737_register(struct wm8737_priv *wm8737,
 	}
 
 	ret = wm8737_reset(codec);
+	snd_soc_update_bits(codec,WM8737_LEFT_PGA_VOLUME,WM8737_LVU_MASK,1 << WM8737_LVU_SHIFT);
+	snd_soc_update_bits(codec,WM8737_RIGHT_PGA_VOLUME,WM8737_RVU_MASK,1 << WM8737_RVU_SHIFT);
+
 	if (ret < 0) {
 		dev_err(codec->dev, "Failed to issue reset: %d\n", ret);
 		goto err_regulator_enable;

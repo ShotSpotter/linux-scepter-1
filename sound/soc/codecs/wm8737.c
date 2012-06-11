@@ -489,7 +489,7 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		af |= 0x3;
 		break;
 	case SND_SOC_DAIFMT_DSP_B:
-		af |= 0x13;
+		af |= (1 << WM8737_LRP_SHIFT) | 0x3;
 		break;
 	default:
 		return -EINVAL;
@@ -499,7 +499,7 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	case SND_SOC_DAIFMT_NB_NF:
 		break;
 	case SND_SOC_DAIFMT_NB_IF:
-		af |= WM8737_LRP;
+		af |= (1 << WM8737_LRP_SHIFT);
 		break;
 	default:
 		return -EINVAL;

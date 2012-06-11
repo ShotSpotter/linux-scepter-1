@@ -389,13 +389,13 @@ static int wm8737_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_FORMAT_S16_LE:
 		break;
 	case SNDRV_PCM_FORMAT_S20_3LE:
-		af |= 0x8;
+		af |= 1 << WM8737_WL_SHIFT;
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
-		af |= 0x10;
+		af |= 2 << WM8737_WL_SHIFT;
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
-		af |= 0x18;
+		af |= 3 << WM8737_WL_SHIFT;
 		break;
 	default:
 		return -EINVAL;

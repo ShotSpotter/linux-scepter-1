@@ -438,8 +438,8 @@ static struct wm8737_omap_data scepter_wm8737_master =
 {
 		.wm8737_id = 0,
 		.mcbsp_id = 0,
-		.codec_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
-		.cpu_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+		.codec_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
+		.cpu_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
 };
 
 static struct wm8737_omap_data scepter_wm8737_slaves[] =
@@ -447,8 +447,8 @@ static struct wm8737_omap_data scepter_wm8737_slaves[] =
 		{
 				.wm8737_id = 1,
 				.mcbsp_id = 1,
-				.codec_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
-				.cpu_dai_audio_fmt = SND_SOC_DAIFMT_DSP_A,
+				.codec_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
+				.cpu_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
 		}
 };
 

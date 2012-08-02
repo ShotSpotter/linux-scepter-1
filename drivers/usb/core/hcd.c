@@ -1261,7 +1261,7 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
 	*dma_handle = 0;
 }
 
-static void unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
+void unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 {
 	enum dma_data_direction dir;
 

@@ -57,6 +57,8 @@
 #include "hsmmc.h"
 #include "mux.h"
 
+
+
 #define GPMC_CS0_BASE  0x60
 #define GPMC_CS_SIZE   0x30
 
@@ -786,6 +788,32 @@ static void __init scepter_pmic_init(void)
 	i2c_put_adapter(adapter);
 }
 
+static struct omap_musb_board_data musb_board_data = {
+	.interface_type         = MUSB_INTERFACE_ULPI,
+	.mode                   = MUSB_PERIPHERAL,
+	.power                  = 500,
+};
+
+static __init void scepter_musb_init(void)
+{
+	u32 devconf2;
+
+	/*
+	 * Set up USB clock/mode in the DEVCONF2 register.
+	 */
+	devconf2 = omap_ctrl_readl(AM35XX_CONTROL_DEVCONF2);
+
+	/* USB2.0 PHY reference clock is 13 MHz */
+	devconf2 &= ~(CONF2_REFFREQ | CONF2_OTGMODE | CONF2_PHY_GPIOMODE);
+	devconf2 |=  CONF2_REFFREQ_13MHZ | CONF2_SESENDEN | CONF2_VBDTCTEN
+			| CONF2_DATPOL;
+
+	omap_ctrl_writel(devconf2, AM35XX_CONTROL_DEVCONF2);
+
+	usb_musb_init(&musb_board_data);
+}
+
+
 static void __init scepter_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
@@ -804,6 +832,8 @@ static void __init scepter_init(void)
 	usb_ohci_init(&ohci_pdata);
 
 	scepter_ethernet_init(&scepter_emac_pdata);
+
+	scepter_musb_init();
 
 	i2c_register_board_info(1, scepter_i2c1_boardinfo,
 				ARRAY_SIZE(scepter_i2c1_boardinfo));

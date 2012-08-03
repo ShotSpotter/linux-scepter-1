@@ -763,7 +763,7 @@ void omap_dm_timer_set_tcm(struct omap_dm_timer *timer, int mode)
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
         l &= ~((u32)OMAP_TIMER_CTRL_TCM_BOTHEDGES);
-        l |= (mode << 8);
+        l |= ((mode << 8) | OMAP_TIMER_CTRL_GPOCFG);
 
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
 }

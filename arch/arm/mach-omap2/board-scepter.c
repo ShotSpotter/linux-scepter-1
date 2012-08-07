@@ -476,10 +476,22 @@ static struct platform_device generic_soc_slave = {
 		.id = -1,
 };
 
+#include <linux/mfd/tps65910.h>
+
+struct tps65910_board scepter_tps65910 = {
+	.gpio_base = OMAP_MAX_GPIO_LINES,
+	.en_dev_slp = 1,
+	.irq_base = TPS65910_IRQ_BASE,
+	.irq = INT_34XX_SYS_NIRQ,
+	.tps65910_pmic_init_data = NULL,
+	.slp_keepon = NULL,
+};
+
 #define TPS65910_I2C_ADDRESS 0x2D
 static struct i2c_board_info __initdata scepter_i2c1_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tps65910", TPS65910_I2C_ADDRESS),
+		.platform_data = &scepter_tps65910,
 	},
 };
 

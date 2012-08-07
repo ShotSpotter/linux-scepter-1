@@ -78,16 +78,16 @@ static irqreturn_t tps65910_irq(int irq, void *irq_data)
 	return IRQ_HANDLED;
 }
 
-static void tps65910_irq_lock(struct irq_data *data)
+static void tps65910_irq_lock(unsigned int irq)
 {
-	struct tps65910 *tps65910 = irq_data_get_irq_chip_data(data);
+	struct tps65910 *tps65910 = get_irq_chip_data(irq);
 
 	mutex_lock(&tps65910->irq_lock);
 }
 
-static void tps65910_irq_sync_unlock(struct irq_data *data)
+static void tps65910_irq_sync_unlock(unsigned int irq)
 {
-	struct tps65910 *tps65910 = irq_data_get_irq_chip_data(data);
+	struct tps65910 *tps65910 = get_irq_chip_data(irq);
 	u16 reg_mask;
 	u8 reg;
 
@@ -105,26 +105,26 @@ static void tps65910_irq_sync_unlock(struct irq_data *data)
 	mutex_unlock(&tps65910->irq_lock);
 }
 
-static void tps65910_irq_enable(struct irq_data *data)
+static void tps65910_irq_enable(unsigned int irq)
 {
-	struct tps65910 *tps65910 = irq_data_get_irq_chip_data(data);
+	struct tps65910 *tps65910 = get_irq_chip_data(irq);
 
-	tps65910->irq_mask &= ~( 1 << irq_to_tps65910_irq(tps65910, data->irq));
+	tps65910->irq_mask &= ~( 1 << irq_to_tps65910_irq(tps65910, irq));
 }
 
-static void tps65910_irq_disable(struct irq_data *data)
+static void tps65910_irq_disable(unsigned int irq)
 {
-	struct tps65910 *tps65910 = irq_data_get_irq_chip_data(data);
+	struct tps65910 *tps65910 = get_irq_chip_data(irq);
 
-	tps65910->irq_mask |= ( 1 << irq_to_tps65910_irq(tps65910, data->irq));
+	tps65910->irq_mask |= ( 1 << irq_to_tps65910_irq(tps65910, irq));
 }
 
 static struct irq_chip tps65910_irq_chip = {
 	.name = "tps65910",
-	.irq_bus_lock = tps65910_irq_lock,
-	.irq_bus_sync_unlock = tps65910_irq_sync_unlock,
-	.irq_disable = tps65910_irq_disable,
-	.irq_enable = tps65910_irq_enable,
+	.bus_lock = tps65910_irq_lock,
+	.bus_sync_unlock = tps65910_irq_sync_unlock,
+	.disable = tps65910_irq_disable,
+	.enable = tps65910_irq_enable,
 };
 
 int tps65910_irq_init(struct tps65910 *tps65910, int irq,
@@ -158,10 +158,10 @@ int tps65910_irq_init(struct tps65910 *tps65910, int irq,
 	for (cur_irq = tps65910->irq_base;
 	     cur_irq < TPS65910_NUM_IRQ + tps65910->irq_base;
 	     cur_irq++) {
-		irq_set_chip_data(cur_irq, tps65910);
-		irq_set_chip_and_handler(cur_irq, &tps65910_irq_chip,
+		set_irq_chip_data(cur_irq, tps65910);
+		set_irq_chip_and_handler(cur_irq, &tps65910_irq_chip,
 					 handle_edge_irq);
-		irq_set_nested_thread(cur_irq, 1);
+		set_irq_nested_thread(cur_irq, 1);
 
 		/* ARM needs us to explicitly flag the IRQ as valid
 		 * and will set them noprobe when we do so. */

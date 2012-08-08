@@ -102,6 +102,9 @@
  */
 
 
+/*Register RTC_CTRL  (0x10) register.RegisterDescription */
+#define TPS65910_RTC_CTRL_STOP_RTC_MASK  0x01 /*0=stop, 1=run */
+
 /*Register BCK1  (0x80) register.RegisterDescription */
 #define BCK1_BCKUP_MASK					0xFF
 #define BCK1_BCKUP_SHIFT				0

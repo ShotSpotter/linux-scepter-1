@@ -128,6 +128,7 @@ static inline u8 ohci_omap_readb(void __iomem *base, u8 reg)
 	return __raw_readb(base + reg);
 }
 
+#include <linux/pm_runtime.h>
 /*-------------------------------------------------------------------------*/
 
 struct ohci_hcd_omap3 {
@@ -170,6 +171,9 @@ static void ohci_omap3_clock_power(struct ohci_hcd_omap3 *omap, int on)
 
 static int ohci_omap3_init(struct usb_hcd *hcd)
 {
+
+	dev_dbg(hcd->self.controller, "starting OHCI controller\n");
+
 	return ohci_init(hcd_to_ohci(hcd));
 }
 

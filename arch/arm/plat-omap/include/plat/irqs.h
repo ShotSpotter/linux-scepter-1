@@ -376,8 +376,6 @@
 #define OMAP_FPGA_IRQ_END	(OMAP_FPGA_IRQ_BASE + OMAP_FPGA_NR_IRQS)
 
 #define	TPS65910_IRQ_BASE	(OMAP_FPGA_IRQ_END)
-#ifdef CONFIG_MFD_TPS65910
-#endif
 
 /* External TWL4030 can handle interrupts on 2430 and 34xx boards */
 #define	TWL4030_IRQ_BASE	(OMAP_FPGA_IRQ_END)

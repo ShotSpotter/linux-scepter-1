@@ -1,0 +1,11 @@
+#!/bin/sh
+# Note: KCONFIG_NOTIMESTAMP should be set 
+diff -q .config arch/arm/configs/scepter_defconfig
+cd  arch/arm/configs
+patch --merge -F3 -u -o scepter_debug_defconfig < scepter_debug_defconfig.diff
+if [ "$?" != "0" ]; then
+    git difftool scepter_debug_defconfig
+    diff -uNr scepter_defconfig scepter_debug_defconfig | sed 's/scepter_debug_defconfig/scepter_defconfig/g' > scepter_debug_defconfig.diff
+fi
+echo "git diff for configs:"
+git diff --name-only . | grep defconfig

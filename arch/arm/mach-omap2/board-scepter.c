@@ -773,7 +773,7 @@ static void __init scepter_pmic_init(void)
 	adapter = i2c_get_adapter(1);
 	if (adapter == NULL) {
 		printk(KERN_ERR "I2C adapter[1] is not available ?!\n");
-		return -1;
+		return;
 	}
 
 	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);

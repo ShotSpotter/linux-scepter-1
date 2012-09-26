@@ -324,4 +324,7 @@ extern struct snd_soc_codec_device soc_codec_dev_wm8737;
 #define WM8737_RESET_SHIFT                           0  /* RESET - [8:0] */
 #define WM8737_RESET_WIDTH                           9  /* RESET - [8:0] */
 
+int wm8737_micbias_regulator_voltage_init(void);
+void wm8737_micbias_regulator_voltage_exit(void);
+
 #endif

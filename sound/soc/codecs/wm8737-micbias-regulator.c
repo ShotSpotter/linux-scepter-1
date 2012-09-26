@@ -29,7 +29,7 @@
 /*TODO DO NOT WANT to reimplement soc i2c functions like other people
  */
 #include <linux/regulator/wm8737-micbias-regulator.h>
-#include "../../sound/soc/codecs/wm8737.h"
+#include "wm8737.h"
 #include <linux/regulator/machine.h>
 
 #define NUM_MICBIAS_LVL 4
@@ -338,17 +338,15 @@ static struct platform_driver wm8737_micbias_regulator_voltage_driver = {
 	},
 };
 
-static int __init wm8737_micbias_regulator_voltage_init(void)
+int __init wm8737_micbias_regulator_voltage_init(void)
 {
 	return platform_driver_register(&wm8737_micbias_regulator_voltage_driver);
 }
-subsys_initcall(wm8737_micbias_regulator_voltage_init);
 
-static void __exit wm8737_micbias_regulator_voltage_exit(void)
+void __exit wm8737_micbias_regulator_voltage_exit(void)
 {
 	platform_driver_unregister(&wm8737_micbias_regulator_voltage_driver);
 }
-module_exit(wm8737_micbias_regulator_voltage_exit);
 
 MODULE_AUTHOR("Sarah Newman <snewman@shotspotter.com>");
 MODULE_DESCRIPTION("wm8737 micbias voltage driver");

@@ -888,6 +888,10 @@ static int __init wm8737_modinit(void)
 {
 	int ret,i;
 
+#ifdef CONFIG_SND_SOC_WM8737_MICBIAS
+	wm8737_micbias_regulator_voltage_init();
+#endif
+
 	for(i = 0; i < MAX_WM8737_CNT; i++) {
 		wm8737_dai[i].name = "wm8737";
 		wm8737_dai[i].capture.stream_name = "Capture";
@@ -917,6 +921,10 @@ module_init(wm8737_modinit);
 
 static void __exit wm8737_exit(void)
 {
+#ifdef CONFIG_SND_SOC_WM8737_MICBIAS
+	wm8737_micbias_regulator_voltage_exit();
+#endif
+
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	i2c_del_driver(&wm8737_i2c_driver);
 #endif

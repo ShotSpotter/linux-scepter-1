@@ -200,8 +200,10 @@ config SND_SOC_WM8731
 
 config SND_SOC_WM8737
 	tristate
-
-
+	
+config SND_SOC_WM8737_MICBIAS
+	bool "wm8737 micbias regulator" if SND_SOC_WM8737
+	
 config SND_SOC_WM8750
 	tristate
 
@@ -277,3 +279,7 @@ config SND_SOC_WM2000
 
 config SND_SOC_GENERIC_SLAVE
 	tristate
+
+
+  	
+	

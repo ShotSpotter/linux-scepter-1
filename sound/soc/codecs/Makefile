@@ -33,7 +33,11 @@ snd-soc-wm8711-objs := wm8711.o
 snd-soc-wm8727-objs := wm8727.o
 snd-soc-wm8728-objs := wm8728.o
 snd-soc-wm8731-objs := wm8731.o
-snd-soc-wm8737-objs := wm8737.o
+snd-soc-wm8737-objs := wm8737.o 
+ifeq ($(CONFIG_SND_SOC_WM8737_MICBIAS),y)
+  snd-soc-wm8737-objs += wm8737-micbias-regulator.o
+endif
+
 snd-soc-wm8750-objs := wm8750.o
 snd-soc-wm8753-objs := wm8753.o
 snd-soc-wm8776-objs := wm8776.o
@@ -57,6 +61,7 @@ snd-soc-wm9712-objs := wm9712.o
 snd-soc-wm9713-objs := wm9713.o
 snd-soc-wm-hubs-objs := wm_hubs.o
 
+ 
 # Amp
 snd-soc-max9877-objs := max9877.o
 snd-soc-tpa6130a2-objs := tpa6130a2.o
@@ -98,6 +103,8 @@ obj-$(CONFIG_SND_SOC_WM8727)	+= snd-soc-wm8727.o
 obj-$(CONFIG_SND_SOC_WM8728)	+= snd-soc-wm8728.o
 obj-$(CONFIG_SND_SOC_WM8731)	+= snd-soc-wm8731.o
 obj-$(CONFIG_SND_SOC_WM8737)	+= snd-soc-wm8737.o
+
+
 obj-$(CONFIG_SND_SOC_WM8750)	+= snd-soc-wm8750.o
 obj-$(CONFIG_SND_SOC_WM8753)	+= snd-soc-wm8753.o
 obj-$(CONFIG_SND_SOC_WM8776)	+= snd-soc-wm8776.o

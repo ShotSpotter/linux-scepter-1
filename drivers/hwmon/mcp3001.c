@@ -76,6 +76,13 @@ static ssize_t mcp3k1_store(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(mcp3k1, 0666, mcp3k1_show, mcp3k1_store);
 
+static ssize_t
+name_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", DRVNAME);
+}
+static DEVICE_ATTR(name, 0444, name_show, NULL);
+
 static DEVICE_ATTR(00, 0440, mcp3k1_show, NULL);
 static DEVICE_ATTR(01, 0440, mcp3k1_show, NULL);
 static DEVICE_ATTR(02, 0440, mcp3k1_show, NULL);
@@ -142,6 +149,7 @@ static const struct attribute *mcp3k1_attrs[] = {
 	&dev_attr_1d.attr,
 	&dev_attr_1e.attr,
 	&dev_attr_1f.attr,
+	&dev_attr_name.attr,
 	NULL,
 };
 
@@ -310,7 +318,7 @@ static int __devexit mcp3k1_remove(struct spi_device *spi)
 
 static struct spi_driver mcp3k1_driver = {
 	.driver = {
-		.name = "mcp3k1",
+		.name = DRVNAME,
 		.owner = THIS_MODULE,
 	},
 	.probe    = mcp3k1_probe,

@@ -83,72 +83,78 @@ name_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 static DEVICE_ATTR(name, 0444, name_show, NULL);
 
-static DEVICE_ATTR(00, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(01, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(02, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(03, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(04, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(05, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(06, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(07, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(08, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(09, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0a, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0b, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0c, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0d, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0e, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(0f, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(10, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(11, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(12, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(13, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(14, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(15, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(16, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(17, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(18, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(19, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1a, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1b, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1c, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1d, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1e, 0440, mcp3k1_show, NULL);
-static DEVICE_ATTR(1f, 0440, mcp3k1_show, NULL);
+#define set_in(offset) \
+static DEVICE_ATTR(in##offset##_input, 0440, mcp3k1_show, NULL)
+
+set_in(00);
+set_in(01);
+set_in(02);
+set_in(03);
+set_in(04);
+set_in(05);
+set_in(06);
+set_in(07);
+set_in(08);
+set_in(09);
+set_in(10);
+set_in(11);
+set_in(12);
+set_in(13);
+set_in(14);
+set_in(15);
+set_in(16);
+set_in(17);
+set_in(18);
+set_in(19);
+set_in(20);
+set_in(21);
+set_in(22);
+set_in(23);
+set_in(24);
+set_in(25);
+set_in(26);
+set_in(27);
+set_in(28);
+set_in(29);
+set_in(30);
+set_in(31);
+
+
+#define set_in_arr(offset) &dev_attr_in##offset##_input.attr
 
 static const struct attribute *mcp3k1_attrs[] = {
-	&dev_attr_00.attr,
-	&dev_attr_01.attr,
-	&dev_attr_02.attr,
-	&dev_attr_03.attr,
-	&dev_attr_04.attr,
-	&dev_attr_05.attr,
-	&dev_attr_06.attr,
-	&dev_attr_07.attr,
-	&dev_attr_08.attr,
-	&dev_attr_09.attr,
-	&dev_attr_0a.attr,
-	&dev_attr_0b.attr,
-	&dev_attr_0c.attr,
-	&dev_attr_0d.attr,
-	&dev_attr_0e.attr,
-	&dev_attr_0f.attr,
-	&dev_attr_10.attr,
-	&dev_attr_11.attr,
-	&dev_attr_12.attr,
-	&dev_attr_13.attr,
-	&dev_attr_14.attr,
-	&dev_attr_15.attr,
-	&dev_attr_16.attr,
-	&dev_attr_17.attr,
-	&dev_attr_18.attr,
-	&dev_attr_19.attr,
-	&dev_attr_1a.attr,
-	&dev_attr_1b.attr,
-	&dev_attr_1c.attr,
-	&dev_attr_1d.attr,
-	&dev_attr_1e.attr,
-	&dev_attr_1f.attr,
+	set_in_arr(00),
+	set_in_arr(01),
+	set_in_arr(02),
+	set_in_arr(03),
+	set_in_arr(04),
+	set_in_arr(05),
+	set_in_arr(06),
+	set_in_arr(07),
+	set_in_arr(08),
+	set_in_arr(09),
+	set_in_arr(10),
+	set_in_arr(11),
+	set_in_arr(12),
+	set_in_arr(13),
+	set_in_arr(14),
+	set_in_arr(15),
+	set_in_arr(16),
+	set_in_arr(17),
+	set_in_arr(18),
+	set_in_arr(19),
+	set_in_arr(20),
+	set_in_arr(21),
+	set_in_arr(22),
+	set_in_arr(23),
+	set_in_arr(24),
+	set_in_arr(25),
+	set_in_arr(26),
+	set_in_arr(27),
+	set_in_arr(28),
+	set_in_arr(29),
+	set_in_arr(30),
+	set_in_arr(31),
 	&dev_attr_name.attr,
 	NULL,
 };

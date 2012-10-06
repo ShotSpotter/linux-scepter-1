@@ -17,13 +17,17 @@ struct heater {
 	const char *name;
 };
 
-#define CPU_ADC_HEAT_LFT 70
-#define CPU_ADC_HEAT_RGT 71
+#define HEAT_ADC0_GPIO 70
+#define HEAT_ADC1_GPIO 71
+#define HEAT_3304_GPIO 37
 
 static struct heater heaters[] = {
-	{ .dev = NULL, .gpio = CPU_ADC_HEAT_LFT, .name = "CPU_ADC_HEAT_LFT" },
-	{ .dev = NULL, .gpio = CPU_ADC_HEAT_RGT, .name ="CPU_ADC_HEAT_RGT" },
+	{ .dev = NULL, .gpio = HEAT_ADC0_GPIO, .name = "heater-adc0" },
+	{ .dev = NULL, .gpio = HEAT_ADC1_GPIO, .name = "heater-adc1" },
+	{	.dev = NULL, .gpio = HEAT_3304_GPIO, .name = "heater-gsm" },
 };
+
+#define HEATER_CNT (sizeof(heaters)/sizeof(heaters[0]))
 
 static ssize_t
 heater_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -123,7 +127,7 @@ heater_init(void)
 		return retval;
 	}
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < HEATER_CNT; i++) {
 		retval = heater_dev_init(&heaters[i]);
 		if (retval != 0) {
 			goto error;
@@ -147,7 +151,7 @@ static void __exit
 heater_exit(void)
 {
 	int i;
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < HEATER_CNT; i++) {
 		device_unregister(heaters[i].dev);
 	}
 	class_unregister(&heater_class);

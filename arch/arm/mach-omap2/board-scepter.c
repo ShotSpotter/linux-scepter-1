@@ -57,7 +57,8 @@
 #include "hsmmc.h"
 #include "mux.h"
 
-
+static char* part_num = "";
+module_param(part_num, charp, 0444);
 
 #define GPMC_CS0_BASE  0x60
 #define GPMC_CS_SIZE   0x30
@@ -571,11 +572,11 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
-static struct omap2_hsmmc_info mmc[] = {
+static struct omap2_hsmmc_info mmc_if_brd[] = {
 	{
 		.mmc            = 1,
 		.wires          = 4,
-		.gpio_cd        = -1,
+		.gpio_cd        = 99,
 		.gpio_wp        = -1,
 		.ocr_mask       = MMC_VDD_32_33	| MMC_VDD_33_34,
 	},
@@ -583,6 +584,17 @@ static struct omap2_hsmmc_info mmc[] = {
 		.mmc            = 2,
 		.wires          = 1,
 		.gpio_cd        = -1,
+		.gpio_wp        = -1,
+		.ocr_mask       = MMC_VDD_32_33	| MMC_VDD_33_34,
+	},
+	{}      /* Terminator */
+};
+
+static struct omap2_hsmmc_info mmc_no_if_brd[] = {
+	{
+		.mmc            = 1,
+		.wires          = 4,
+		.gpio_cd        = 99,
 		.gpio_wp        = -1,
 		.ocr_mask       = MMC_VDD_32_33	| MMC_VDD_33_34,
 	},
@@ -825,13 +837,64 @@ static __init void scepter_musb_init(void)
 	usb_musb_init(&musb_board_data);
 }
 
+static void __init ericsson_cellular_init(void)
+{
+	scepter_cpu_usb_init();
+	scepter_gsm_init();
+	usb_ohci_init(&ohci_pdata);
+}
+
+struct scepter_part_t {
+	const char* part;
+	int has_ethernet;
+	void (*misc_init)(void);
+	void (*gpio_init)(void);
+	void (*cell_init)(void);
+};
+
+extern void scepter_gpio_revb_init(void);
+
+const struct scepter_part_t scepter_part_list[] =
+{
+		{ .part = "400-0100-01RevB2",
+			.has_ethernet = 1,
+			.gpio_init = scepter_gpio_revb_init,
+			.cell_init = ericsson_cellular_init,
+		},
+		{ .part = NULL},
+};
+
+static void __init scepter_part_init(void)
+{
+	const struct scepter_part_t* spart = scepter_part_list;
+	while(spart->part && strcmp(spart->part,part_num) != 0) {
+		spart++;
+	}
+
+	if(spart->part == NULL) {
+		printk(KERN_CRIT "Cannot find scepter part number.\n");
+
+		return;
+	}
+
+	if(spart->gpio_init)
+		spart->gpio_init();
+
+	if(spart->has_ethernet)
+		scepter_ethernet_init(&scepter_emac_pdata);
+
+	if(spart->cell_init)
+		spart->cell_init();
+
+}
+
+extern int scepter_detect_if_brd(void);
 
 static void __init scepter_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
 
-	scepter_cpu_usb_init();
-	scepter_gsm_init();
+	scepter_part_init();
 
 	scepter_i2c_init();
 	platform_add_devices(scepter_devices,
@@ -841,24 +904,15 @@ static void __init scepter_init(void)
 	omap_serial_init();
 	scepter_flash_init();
 
-	usb_ohci_init(&ohci_pdata);
-
-	scepter_ethernet_init(&scepter_emac_pdata);
-
-	scepter_musb_init();
-
-	scepter_gpio_init();
+	if(scepter_detect_if_brd() != 0)
+		scepter_musb_init();
 
 	i2c_register_board_info(1, scepter_i2c1_boardinfo,
 				ARRAY_SIZE(scepter_i2c1_boardinfo));
 
 	/* MMC init function */
-	omap2_hsmmc_init(mmc);
+	omap2_hsmmc_init(scepter_detect_if_brd() != 0 ? mmc_if_brd : mmc_no_if_brd);
 
-        /* CPLD - Set the version gpio pins to MODE 4 and IN */
-        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 67);
-        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 68);
-        omap_mux_set_gpio(OMAP_MUX_MODE4 | OMAP_PIN_INPUT, 69);
 	scepter_pmic_init();
 }
 

@@ -800,22 +800,6 @@ static void __init scepter_pmic_init(void)
 	i2c_put_adapter(adapter);
 }
 
-#define SLEEP_GPIO 1
-static void scepter_gpio_init(void)
-{
-	int r;
-	int gpio = SLEEP_GPIO;
-	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
-	r = gpio_request(gpio, "tps65910-sleep");
-	if (r < 0) {
-		printk(KERN_ERR "failed to request GPIO#%d\n", gpio);
-		return;
-	}
-	gpio_direction_output(gpio, 1);
-	gpio_set_value(gpio, 1);
-	gpio_export(gpio,0);
-}
-
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type         = MUSB_INTERFACE_ULPI,
 	.mode                   = MUSB_PERIPHERAL,

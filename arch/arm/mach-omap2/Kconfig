@@ -93,6 +93,10 @@ config MACH_SCEPTER
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
 	select ARCH_AM3517
+	
+config MACH_SCEPTER_BOARD_TEST
+	bool "Enable board test related functionality"
+	depends on MACH_SCEPTER
 
 config MACH_OMAP3_PANDORA
 	bool "OMAP3 Pandora"

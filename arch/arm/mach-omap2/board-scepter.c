@@ -716,6 +716,8 @@ static void __init scepter_cpu_usb_init(void)
 		return;
 	}
 	gpio_direction_output(gpio, 1);
+	gpio_set_value(gpio, 1);
+	gpio_export(gpio,0);
 
 	gpio = USB_SOFTCON_GPIO;
 

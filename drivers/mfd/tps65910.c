@@ -150,35 +150,25 @@ static int __init tps65910_sleepinit(struct tps65910 *tps65910,
 		goto err_sleep_init;
 	}
 
-	/* Return if there is no sleep keepon data. */
-	if (!pmic_pdata->slp_keepon)
-		return 0;
-
-	if (pmic_pdata->slp_keepon->therm_keepon) {
-		ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
+	ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
 				SLEEP_KEEP_RES_ON_THERM_KEEPON_MASK);
-		if (ret < 0) {
-			dev_err(dev, "set therm_keepon failed: %d\n", ret);
-			goto disable_dev_slp;
-		}
+	if (ret < 0) {
+		dev_err(dev, "set therm_keepon failed: %d\n", ret);
+		goto disable_dev_slp;
 	}
 
-	if (pmic_pdata->slp_keepon->clkout32k_keepon) {
-		ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
-				SLEEP_KEEP_RES_ON_CLKOUT32K_KEEPON_MASK);
-		if (ret < 0) {
-			dev_err(dev, "set clkout32k_keepon failed: %d\n", ret);
-			goto disable_dev_slp;
-		}
+	ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
+			SLEEP_KEEP_RES_ON_CLKOUT32K_KEEPON_MASK);
+	if (ret < 0) {
+		dev_err(dev, "set clkout32k_keepon failed: %d\n", ret);
+		goto disable_dev_slp;
 	}
 
-	if (pmic_pdata->slp_keepon->i2chs_keepon) {
-		ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
-				SLEEP_KEEP_RES_ON_I2CHS_KEEPON_MASK);
-		if (ret < 0) {
-			dev_err(dev, "set i2chs_keepon failed: %d\n", ret);
-			goto disable_dev_slp;
-		}
+	ret = tps65910_set_bits(tps65910, TPS65910_SLEEP_KEEP_RES_ON,
+			SLEEP_KEEP_RES_ON_I2CHS_KEEPON_MASK);
+	if (ret < 0) {
+		dev_err(dev, "set i2chs_keepon failed: %d\n", ret);
+		goto disable_dev_slp;
 	}
 
 	return 0;

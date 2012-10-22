@@ -217,6 +217,7 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 	struct tps65910_board *pmic_plat_data;
 	struct tps65910_platform_data *init_data;
 	int ret = 0;
+	u8 val;
 
 	pmic_plat_data = dev_get_platdata(&i2c->dev);
 	if (!pmic_plat_data)
@@ -263,6 +264,11 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 	tps65910_clear_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_RTC_PWDN_MASK | DEVCTRL_CK32K_CTRL_MASK);
 	tps65910_set_bits(tps65910,TPS65910_RTC_CTRL,TPS65910_RTC_CTRL_STOP_RTC_MASK);
 	tps65910_set_bits(tps65910,TPS65910_RTC_INTERRUPTS,(1 << 2) | (1 << 0));
+
+
+	tps65910->read(tps65910, TPS65910_PUADEN, 1, &val);
+
+	dev_warn(tps65910->dev, "tps65910 puaden: %02X\n", (int)val);
 
 	ret = device_create_file(tps65910->dev, &dev_attr_sleeping);
 	if (ret < 0)

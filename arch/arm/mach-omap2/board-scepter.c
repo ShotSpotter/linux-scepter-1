@@ -481,7 +481,11 @@ static struct platform_device generic_soc_slave = {
 
 struct tps65910_board scepter_tps65910 = {
 	.gpio_base = OMAP_MAX_GPIO_LINES,
+#ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
+	.en_dev_slp = 1,
+#else
 	.en_dev_slp = 0,
+#endif
 	.irq_base = TPS65910_IRQ_BASE,
 	.irq = INT_34XX_SYS_NIRQ,
 	.tps65910_pmic_init_data = NULL,

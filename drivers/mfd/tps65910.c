@@ -190,6 +190,35 @@ err_sleep_init:
 	return ret;
 }
 
+static ssize_t tps65910_sleeping(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct tps65910 *tps65910 = dev_get_drvdata(dev);
+	u8 reg;
+	int len = 0;
+
+	tps65910->read(tps65910, TPS65910_REF, 1, &reg);
+	len += sprintf(buf+len,"%d\n", ((reg & 3) == 3) ? 1 : 0 );
+	return len;
+}
+static const DEVICE_ATTR(sleeping, 0444,
+		tps65910_sleeping, NULL);
+
+static ssize_t tps65910_sleep_enabled(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct tps65910 *tps65910 = dev_get_drvdata(dev);
+	u8 reg;
+	int len = 0;
+
+	tps65910->read(tps65910, TPS65910_DEVCTRL, 1, &reg);
+
+	len += sprintf(buf+len,"%d\n",
+			(reg & DEVCTRL_DEV_SLP_MASK) >> DEVCTRL_DEV_SLP_SHIFT);
+	return len;
+}
+static const DEVICE_ATTR(sleep_enabled, 0444,
+		tps65910_sleep_enabled, NULL);
 
 static int tps65910_i2c_probe(struct i2c_client *i2c,
 			    const struct i2c_device_id *id)
@@ -226,6 +255,7 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 	if (ret < 0)
 		goto err;
 
+
 	init_data->irq = pmic_plat_data->irq;
 	init_data->irq_base = pmic_plat_data->irq_base;
 
@@ -233,6 +263,8 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 
 	tps65910_sleepinit(tps65910, pmic_plat_data);
 	ret = tps65910_irq_init(tps65910, init_data->irq, init_data);
+	if (ret < 0)
+		goto err;
 
 	tps65910_set_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_DEV_ON_MASK);
 
@@ -241,13 +273,22 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 	tps65910_clear_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_RTC_PWDN_MASK | DEVCTRL_CK32K_CTRL_MASK);
 	tps65910_set_bits(tps65910,TPS65910_RTC_CTRL,TPS65910_RTC_CTRL_STOP_RTC_MASK);
 	tps65910_set_bits(tps65910,TPS65910_RTC_INTERRUPTS,(1 << 2) | (1 << 0));
-#endif
 
+	ret = device_create_file(tps65910->dev, &dev_attr_sleeping);
 	if (ret < 0)
-		goto err;
+		goto err_dev_attr;
+
+	ret = device_create_file(tps65910->dev, &dev_attr_sleep_enabled);
+	if (ret < 0)
+		goto err_dev_attr;
+
+#endif
 
 	kfree(init_data);
 	return ret;
+
+err_dev_attr:
+	tps65910_irq_exit(tps65910);
 
 err:
 	mfd_remove_devices(tps65910->dev);

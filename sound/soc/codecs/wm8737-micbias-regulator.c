@@ -44,6 +44,8 @@ struct wm8737_micbias_data {
 	int avdd_mV; //Only support one value for now
 	int mvdd_mV;
 	struct mutex mutex;
+	/*micbias_level_uV is immutable after the driver
+	 * is initialized and does not need to be protected*/
 	int micbias_level_uV[NUM_MICBIAS_LVL];
 };
 
@@ -60,9 +62,13 @@ const static int AVDD_MULTIPLIER[NUM_MICBIAS_LVL] =
 
 static int wm8737_micbias_is_enabled(struct regulator_dev *rdev)
 {
+	int ret;
 	struct wm8737_micbias_data *data = rdev_get_drvdata(rdev);
+	mutex_lock(&data->mutex);
+	ret = data->enabled;
+	mutex_unlock(&data->mutex);
 
-	return data->enabled;
+	return ret;
 }
 
 static int wm8737_micbias_enable(struct regulator_dev *rdev)

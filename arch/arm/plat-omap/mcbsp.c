@@ -792,15 +792,18 @@ int omap_mcbsp_status_request(unsigned int id, u32 mask, void (*callback)(int id
 	mcbsp->status.mask = mask;
 	mcbsp->status.data = data;
 
+	spin_unlock(&mcbsp->lock);
+
 	ret = request_irq(mcbsp->status_irq, omap_mcbsp_status_irq_handler,
 										0,"McBSP", (void *)mcbsp);
+
+	spin_lock(&mcbsp->lock);
 	if (ret != 0) {
 		mcbsp->status.callback = NULL;
 		mcbsp->status.data = NULL;
 		dev_err(mcbsp->dev, "Unable to request status IRQ %d "
 						"for McBSP%d\n", mcbsp->status_irq,
 						mcbsp->id);
-		goto status_unlock;
 	} 
 	else
 		MCBSP_WRITE(mcbsp, IRQEN, mask);

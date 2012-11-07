@@ -147,30 +147,6 @@ static struct gpio_led gpio_leds[] = {
 		.name			= "CPU_LED_1",
 		.gpio			= 42,
 	},
-	{
-		.name			= "CPU_STAT_LED0",
-		.gpio			= 85,
-	},
-	{
-		.name			= "CPU_STAT_LED1",
-		.gpio			= 86,
-	},
-	{
-		.name			= "CPU_STAT_LED2",
-		.gpio			= 87,
-	},
-	{
-		.name			= "CPU_STAT_LED3",
-		.gpio			= 88,
-	},
-	{
-		.name			= "CPU_STAT_LED4",
-		.gpio			= 89,
-	},
-	{
-		.name			= "CPU_STAT_LED5",
-		.gpio			= 90,
-	},
 };
 static struct gpio_led_platform_data gpio_led_info = {
 	.leds		= gpio_leds,

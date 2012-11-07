@@ -556,7 +556,7 @@ static struct omap2_hsmmc_info mmc_if_brd[] = {
 	{
 		.mmc            = 1,
 		.wires          = 4,
-		.gpio_cd        = 99,
+		.gpio_cd        = -1,
 		.gpio_wp        = -1,
 		.ocr_mask       = MMC_VDD_32_33	| MMC_VDD_33_34,
 	},

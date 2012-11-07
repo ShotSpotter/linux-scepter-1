@@ -835,12 +835,18 @@ struct scepter_part_t {
 };
 
 extern void scepter_gpio_revb_init(void);
+extern void scepter_gpio_init_401_0061_02(void);
 
 const struct scepter_part_t scepter_part_list[] =
 {
 		{ .part = "400-0100-01RevB2",
 			.has_ethernet = 1,
 			.gpio_init = scepter_gpio_revb_init,
+			.cell_init = ericsson_cellular_init,
+		},
+		{ .part = "401-0061-02",
+			.has_ethernet = 0,
+			.gpio_init = scepter_gpio_init_401_0061_02,
 			.cell_init = ericsson_cellular_init,
 		},
 		{ .part = NULL},

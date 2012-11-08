@@ -259,11 +259,11 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 
 	tps65910_set_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_DEV_ON_MASK);
 
-/*Interrupt every minute*/
+/*Interrupt every second*/
 #ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
 	tps65910_clear_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_RTC_PWDN_MASK | DEVCTRL_CK32K_CTRL_MASK);
 	tps65910_set_bits(tps65910,TPS65910_RTC_CTRL,TPS65910_RTC_CTRL_STOP_RTC_MASK);
-	tps65910_set_bits(tps65910,TPS65910_RTC_INTERRUPTS,(1 << 2) | (1 << 0));
+	tps65910_set_bits(tps65910,TPS65910_RTC_INTERRUPTS,(1 << 2) | (0 << 0));
 
 
 	tps65910->read(tps65910, TPS65910_PUADEN, 1, &val);

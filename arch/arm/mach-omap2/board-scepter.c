@@ -611,106 +611,6 @@ static void __init scepter_spi_init(void)
 			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
-#define GSM_3304_ON	54
-#define GSM_PWRON	55
-#define GSM_HWR		64
-
-static void __init scepter_gsm_init(void)
-{
-	int r, i;
-
-	omap_mux_init_gpio(GSM_PWRON, OMAP_PIN_OUTPUT);
-	r = gpio_request(GSM_PWRON, "gsm-pwron");
-	if (r < 0) {
-		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_PWRON);
-		return;
-	}
-	gpio_export(GSM_PWRON,0);
-	gpio_direction_output(GSM_PWRON, 0);
-
-        omap_mux_init_gpio(GSM_HWR, OMAP_PIN_INPUT);
-	r = gpio_request(GSM_HWR, "gsm-hwr");
-	if (r < 0) {
-		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_HWR);
-		return;
-	}
-	gpio_export(GSM_HWR,0);
-	gpio_direction_input(GSM_HWR);
-
-	omap_mux_init_gpio(GSM_3304_ON, OMAP_PIN_OUTPUT);
-	r = gpio_request(GSM_3304_ON, "gsm-3304-on");
-	if (r < 0) {
-		printk(KERN_ERR "[GSM] failed to get GPIO#%d\n", GSM_3304_ON);
-		return;
-	}
-	gpio_export(GSM_3304_ON,0);
-	gpio_direction_output(GSM_3304_ON, 0);
-
-#if 0
-        msleep(20000);
-        printk("[GSM] modem HW state: %d\n", gpio_get_value(GSM_HWR));
-        gpio_set_value(GSM_3304_ON, 1);
-        msleep(1);
-        gpio_set_value(GSM_3304_ON, 0);
-#endif
-
-	for (i = 0; i < 2000; i++) {
-		msleep(1);
-		r = gpio_get_value(GSM_HWR);
-		if (r  == 0) break;
-	}
-	/*
-	 * Note - ericsson integrators guide '2/1553-KRD 131 24 Uen Rev A'
-	 * indicates that POWER_ON (GSM_3304_ON_N) should be negated within
-	 * 10 seconds of HW_READY (GSM_HWR_N) being asserted or else
-	 * the module will enter an uncontrolled shutdown.  However,
-	 * testing suggests that negating POWER_ON will actually turn off
-	 * the module.
-	 */
-
-	/* TODO the board comes up with POWER_ON assertedd.
-	 * A period of time with POWER_ON negated may be necessary
-	 * but this has not been tested.
-	 */
-	if (r != 0) {
-		printk(KERN_ERR "[GSM] initialization failed.\n");
-		return;
-	}
-
-	printk(KERN_INFO "GSM module successfully initialized [%d].\n", i);
-}
-
-#define USB_SPEED_GPIO		74
-#define USB_SOFTCON_GPIO	75
-
-static void __init scepter_cpu_usb_init(void)
-{
-	int r;
-	int gpio = USB_SPEED_GPIO;
-
-	printk("Setting USB speed ...\n");
-	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
-	r = gpio_request(gpio, "usb-speed");
-	if (r < 0) {
-		printk(KERN_ERR "Failed to request GPIO#%d\n", gpio);
-		return;
-	}
-	gpio_direction_output(gpio, 1);
-	gpio_set_value(gpio, 1);
-	gpio_export(gpio,0);
-
-	gpio = USB_SOFTCON_GPIO;
-
-	omap_mux_init_gpio(gpio, OMAP_PIN_OUTPUT);
-	r = gpio_request(gpio, "usb-softcon");
-	if (r < 0) {
-		printk(KERN_ERR "Failed to request GPIO#%d\n", gpio);
-		return;
-	}
-	gpio_direction_output(gpio, 1);
-	gpio_set_value(gpio, 1);
-	gpio_export(gpio,0);
-}
 
 #define TPS65910_DEVCTRL_REG	0x3F
 #define TPS65910_I2C_ADDRESS	0x2D
@@ -821,8 +721,6 @@ static __init void scepter_musb_init(void)
 
 static void __init ericsson_cellular_init(void)
 {
-	scepter_cpu_usb_init();
-	scepter_gsm_init();
 	usb_ohci_init(&ohci_pdata);
 }
 

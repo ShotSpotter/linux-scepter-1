@@ -71,18 +71,25 @@ static struct mtd_partition scepter_nand_partitions[] = {
 		.name           = "xloader",
 		.offset         = 0,
 		.size           = 4 * (SZ_128K),
+#ifndef CONFIG_MACH_SCEPTER_BOARD_TEST
 		.mask_flags     = MTD_WRITEABLE
+#endif
 	},
 	{
 		.name           = "uboot",
 		.offset         = MTDPART_OFS_APPEND,
 		.size           = 14 * (SZ_128K),
+#ifndef CONFIG_MACH_SCEPTER_BOARD_TEST
 		.mask_flags     = MTD_WRITEABLE
+#endif
 	},
 	{
 		.name           = "uboot-params",
 		.offset         = MTDPART_OFS_APPEND,
 		.size           = 2 * (SZ_128K)
+#ifndef CONFIG_MACH_SCEPTER_BOARD_TEST
+		.mask_flags     = MTD_WRITEABLE
+#endif
 	},
 	{
 		.name           = "linux-kernel",

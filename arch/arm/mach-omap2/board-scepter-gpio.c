@@ -195,7 +195,7 @@ struct gpio_export_t __initdata scepter_gpio_revb[] =
 		}
 };
 
-struct gpio_export_t __initdata scepter_gpio_401_0061_02[] =
+struct gpio_export_t __initdata scepter_gpio_400_0100[] =
 	{
 		{ .name =  "tps65910-sleep",
 			.num = 1,
@@ -317,7 +317,7 @@ struct gpio_export_t __initdata scepter_gpio_401_0061_02[] =
 		}
 };
 
-struct gpio_export_t __initdata scepter_gpio_400_0100_01[] =
+struct gpio_export_t __initdata scepter_gpio_400_0103[] =
 	{
 		{ .name =  "tps65910-sleep",
 			.num = 1,
@@ -411,7 +411,7 @@ struct gpio_export_t __initdata scepter_gpio_400_0100_01[] =
 		}
 };
 
-struct gpio_export_t __initdata scepter_gpio_400_0104_01[] =
+struct gpio_export_t __initdata scepter_gpio_400_0105[] =
 	{
 		{ .name =  "tps65910-sleep",
 			.num = 1,
@@ -558,30 +558,30 @@ void __init scepter_gpio_revb_init(void)
 	}
 }
 
-void scepter_gpio_init_400_0104_01(void)
+void __init scepter_gpio_init_400_0105(void)
 {
 	struct gpio_export_t*	gpio;
-	for(gpio = scepter_gpio_400_0104_01; gpio->name; gpio++) {
+	for(gpio = scepter_gpio_400_0105; gpio->name; gpio++) {
 		scepter_gpio_init(gpio);
 	}
 	if_brd_gpio.num = 129;
 	scepter_gpio_init(&if_brd_gpio);
 }
 
-void __init scepter_gpio_init_401_0061_02(void)
+void __init scepter_gpio_init_400_0100(void)
 {
 	struct gpio_export_t*	gpio;
-	for(gpio = scepter_gpio_401_0061_02; gpio->name; gpio++) {
+	for(gpio = scepter_gpio_400_0100; gpio->name; gpio++) {
 		scepter_gpio_init(gpio);
 	}
 	if_brd_gpio.num = 129;
 	scepter_gpio_init(&if_brd_gpio);
 }
 
-void __init scepter_gpio_init_400_0100_01(void)
+void __init scepter_gpio_init_400_0103(void)
 {
 	struct gpio_export_t*	gpio;
-	for(gpio = scepter_gpio_400_0100_01; gpio->name; gpio++) {
+	for(gpio = scepter_gpio_400_0103; gpio->name; gpio++) {
 		scepter_gpio_init(gpio);
 	}
 	if_brd_gpio.num = 129;

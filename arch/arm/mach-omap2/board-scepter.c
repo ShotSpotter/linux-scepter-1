@@ -740,9 +740,9 @@ struct scepter_part_t {
 };
 
 extern void scepter_gpio_revb_init(void);
-extern void scepter_gpio_init_401_0061_02(void);
-extern void scepter_gpio_init_400_0100_01(void);
-extern void scepter_gpio_init_400_0104_01(void);
+extern void scepter_gpio_init_400_0100(void);
+extern void scepter_gpio_init_400_0103(void);
+extern void scepter_gpio_init_400_0105(void);
 
 const struct scepter_part_t scepter_part_list[] =
 {
@@ -751,19 +751,19 @@ const struct scepter_part_t scepter_part_list[] =
 			.gpio_init = scepter_gpio_revb_init,
 			.cell_init = ericsson_cellular_init,
 		},
-		{ .part = "401-0061-02",
+		{ .part = "400-0100",
 			.has_ethernet = 0,
-			.gpio_init = scepter_gpio_init_401_0061_02,
+			.gpio_init = scepter_gpio_init_400_0100,
 			.cell_init = ericsson_cellular_init,
 		},
-		{ .part = "400-0104-01",
+		{ .part = "400-0105",
 			.has_ethernet = 1,
-			.gpio_init = scepter_gpio_init_400_0104_01,
+			.gpio_init = scepter_gpio_init_400_0105,
 			.cell_init = ericsson_cellular_init,
 		},
-		{ .part = "400-0100-01",
+		{ .part = "400-0103",
 			.has_ethernet = 1,
-			.gpio_init = scepter_gpio_init_400_0100_01,
+			.gpio_init = scepter_gpio_init_400_0103,
 			.cell_init = NULL,
 		},
 		{ .part = NULL},
@@ -841,7 +841,7 @@ bad_gpio:
 static void __init scepter_part_init(void)
 {
 	const struct scepter_part_t* spart = scepter_part_list;
-	while(spart->part && strcmp(spart->part,part_num) != 0) {
+	while(spart->part && (strstr(part_num,spart->part) != part_num)) {
 		spart++;
 	}
 

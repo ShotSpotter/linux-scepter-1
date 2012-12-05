@@ -509,10 +509,10 @@ static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 
 static int __init scepter_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 200, NULL, 0);
-	omap_register_i2c_bus(2, 400, scepter_i2c2_boardinfo,
+	omap_register_i2c_bus(1, 100, NULL, 0);
+	omap_register_i2c_bus(2, 100, scepter_i2c2_boardinfo,
 			ARRAY_SIZE(scepter_i2c2_boardinfo));
-	omap_register_i2c_bus(3, 400, scepter_i2c3_boardinfo,
+	omap_register_i2c_bus(3, 100, scepter_i2c3_boardinfo,
 			ARRAY_SIZE(scepter_i2c3_boardinfo));
 
 	return 0;

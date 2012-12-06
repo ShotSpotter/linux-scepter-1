@@ -65,6 +65,8 @@ module_param(part_num, charp, 0444);
 
 #define NAND_BLOCK_SIZE        SZ_128K
 
+#define FULL_PRODUCTION 0
+
 static struct mtd_partition scepter_nand_partitions[] = {
 	/* All the partition sizes are listed in terms of NAND block size */
 	{
@@ -86,15 +88,57 @@ static struct mtd_partition scepter_nand_partitions[] = {
 	{
 		.name           = "uboot-params",
 		.offset         = MTDPART_OFS_APPEND,
-		.size           = 2 * (SZ_128K)
-#ifndef CONFIG_MACH_SCEPTER_BOARD_TEST
+		.size           = 1 * (SZ_128K)
+#if FULL_PRODUCTION
+		.mask_flags     = MTD_WRITEABLE
+#endif
+	},
+	{
+		.name           = "uboot-params-copy",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 1 * (SZ_128K)
+#if FULL_PRODUCTION
 		.mask_flags     = MTD_WRITEABLE
 #endif
 	},
 	{
 		.name           = "linux-kernel",
 		.offset         = MTDPART_OFS_APPEND,
-		.size           = 40 * (SZ_128K)
+		.size           = 40 * (SZ_128K),
+	},
+	{
+		.name           = "linux-kernel-failsafe",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 40 * (SZ_128K),
+#if FULL_PRODUCTION
+		.mask_flags     = MTD_WRITEABLE
+#endif
+	},
+	{
+		.name           = "rootfs-failsafe",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 256 * (SZ_128K),
+#if FULL_PRODUCTION
+		.mask_flags     = MTD_WRITEABLE
+#endif
+	},
+	{
+		.name           = "mfg",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 40 * (SZ_128K),
+#ifndef CONFIG_MACH_SCEPTER_BOARD_TEST
+		.mask_flags     = MTD_WRITEABLE
+#endif
+	},
+	{
+		.name           = "cfg",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 160 * (SZ_128K),
+	},
+	{
+		.name           = "cache",
+		.offset         = MTDPART_OFS_APPEND,
+		.size           = 640 * (SZ_128K),
 	},
 	{
 		.name           = "rootfs",

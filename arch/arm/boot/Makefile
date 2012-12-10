@@ -125,6 +125,7 @@ install: $(obj)/Image
 	$(obj)/Image System.map "$(INSTALL_PATH)"
 
 uinstall: $(obj)/uImage
+	-mkdir -p "$(INSTALL_PATH)"
 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
 	$(obj)/uImage System.map "$(INSTALL_PATH)"
 

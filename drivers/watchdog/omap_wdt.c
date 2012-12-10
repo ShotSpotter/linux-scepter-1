@@ -321,9 +321,6 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 	clk_enable(wdev->ick);
 	clk_enable(wdev->fck);
 
-	omap_wdt_disable(wdev);
-	omap_wdt_adjust_timeout(timer_margin);
-
 	wdev->omap_wdt_miscdev.parent = &pdev->dev;
 	wdev->omap_wdt_miscdev.minor = WATCHDOG_MINOR;
 	wdev->omap_wdt_miscdev.name = "watchdog";

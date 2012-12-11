@@ -138,7 +138,7 @@ static struct mtd_partition scepter_nand_partitions[] = {
 	{
 		.name           = "cache",
 		.offset         = MTDPART_OFS_APPEND,
-		.size           = 640 * (SZ_128K),
+		.size           = 160 * (SZ_128K),
 	},
 	{
 		.name           = "rootfs",

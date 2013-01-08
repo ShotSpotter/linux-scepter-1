@@ -200,6 +200,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			snprintf(hc->name, ARRAY_SIZE(hc->name),
 				"mmc%islot%i", c->mmc, 1);
 		mmc->slots[0].name = hc->name;
+		mmc->max_freq = c->max_freq;
 		mmc->nr_slots = 1;
 		mmc->slots[0].wires = c->wires;
 		mmc->slots[0].internal_clock = !c->ext_clock;

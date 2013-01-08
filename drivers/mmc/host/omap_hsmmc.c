@@ -2101,7 +2101,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		mmc_slot(host).no_off = 1;
 
 	mmc->f_min	= 400000;
-	mmc->f_max	= 52000000;
+	mmc->f_max	= (pdata->max_freq) ? pdata->max_freq : 52000000;
+	if(mmc->f_min > mmc->f_max)
+	  mmc->f_max = mmc->f_min;
 
 	sema_init(&host->sem, 1);
 	spin_lock_init(&host->irq_lock);

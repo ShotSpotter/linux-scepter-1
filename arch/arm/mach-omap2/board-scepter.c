@@ -613,9 +613,11 @@ static struct omap2_hsmmc_info mmc_if_brd[] = {
 	},
 	{
 		.mmc            = 2,
-		.wires          = 1,
+		.wires          = 4,
 		.gpio_cd        = -1,
 		.gpio_wp        = -1,
+		.ext_clock      = 1,
+		.max_freq       = 26000000,
 		.ocr_mask       = MMC_VDD_32_33	| MMC_VDD_33_34,
 	},
 	{}      /* Terminator */

@@ -911,7 +911,7 @@ static void __init scepter_part_init(void)
 	if(spart->cell_init)
 		spart->cell_init();
 
-#if CONFIG_MACH_SCEPTER_BOARD_TEST
+#ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
 	get_audio_gpios();
 #endif
 }

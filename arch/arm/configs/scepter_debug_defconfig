@@ -710,6 +710,7 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_CONNECTOR is not set
 CONFIG_MTD=y
 # CONFIG_MTD_DEBUG is not set
+# CONFIG_MTD_TESTS is not set
 # CONFIG_MTD_CONCAT is not set
 CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_REDBOOT_PARTS is not set
@@ -1066,6 +1067,7 @@ CONFIG_I2C_OMAP=y
 # Other I2C/SMBus bus drivers
 #
 # CONFIG_I2C_PCA_PLATFORM is not set
+# CONFIG_I2C_STUB is not set
 # CONFIG_I2C_DEBUG_CORE is not set
 # CONFIG_I2C_DEBUG_ALGO is not set
 # CONFIG_I2C_DEBUG_BUS is not set
@@ -1915,6 +1917,7 @@ CONFIG_CRYPTO_MANAGER_TESTS=y
 CONFIG_CRYPTO_WORKQUEUE=y
 # CONFIG_CRYPTO_CRYPTD is not set
 # CONFIG_CRYPTO_AUTHENC is not set
+# CONFIG_CRYPTO_TEST is not set
 
 #
 # Authenticated Encryption with Associated Data

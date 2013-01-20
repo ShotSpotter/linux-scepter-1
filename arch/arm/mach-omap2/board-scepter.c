@@ -506,6 +506,10 @@ static struct platform_device generic_soc_slave = {
 
 #include <linux/mfd/tps65910.h>
 
+static struct bck_reg_mode_data scepter_tps65910_bck_mode = {
+		.mode = {0440,0440,0660,0660,0660},
+};
+
 struct tps65910_board scepter_tps65910 = {
 	.gpio_base = OMAP_MAX_GPIO_LINES,
 #ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
@@ -517,6 +521,7 @@ struct tps65910_board scepter_tps65910 = {
 	.irq = INT_34XX_SYS_NIRQ,
 	.tps65910_pmic_init_data = NULL,
 	.slp_keepon = NULL,
+	.bck_reg_modes = &scepter_tps65910_bck_mode,
 };
 
 #define TPS65910_I2C_ADDRESS 0x2D

@@ -1,3 +1,4 @@
+
 /*
  * tps65910.h  --  TI TPS6591x
  *
@@ -47,6 +48,7 @@
 #define TPS65910_BCK3					0x19
 #define TPS65910_BCK4					0x1A
 #define TPS65910_BCK5					0x1B
+#define TPS65910_BCK_COUNT 5
 #define TPS65910_PUADEN					0x1C
 #define TPS65910_REF					0x1D
 #define TPS65910_VRTC					0x1E
@@ -105,27 +107,27 @@
 /*Register RTC_CTRL  (0x10) register.RegisterDescription */
 #define TPS65910_RTC_CTRL_STOP_RTC_MASK  0x01 /*0=stop, 1=run */
 
-/*Register BCK1  (0x80) register.RegisterDescription */
+/*Register BCK1  (0x17) register.RegisterDescription */
 #define BCK1_BCKUP_MASK					0xFF
 #define BCK1_BCKUP_SHIFT				0
 
 
-/*Register BCK2  (0x80) register.RegisterDescription */
+/*Register BCK2  (0x18) register.RegisterDescription */
 #define BCK2_BCKUP_MASK					0xFF
 #define BCK2_BCKUP_SHIFT				0
 
 
-/*Register BCK3  (0x80) register.RegisterDescription */
+/*Register BCK3  (0x19) register.RegisterDescription */
 #define BCK3_BCKUP_MASK					0xFF
 #define BCK3_BCKUP_SHIFT				0
 
 
-/*Register BCK4  (0x80) register.RegisterDescription */
+/*Register BCK4  (0x1A) register.RegisterDescription */
 #define BCK4_BCKUP_MASK					0xFF
 #define BCK4_BCKUP_SHIFT				0
 
 
-/*Register BCK5  (0x80) register.RegisterDescription */
+/*Register BCK5  (0x1B) register.RegisterDescription */
 #define BCK5_BCKUP_MASK					0xFF
 #define BCK5_BCKUP_SHIFT				0
 
@@ -724,6 +726,10 @@ struct tps65910_sleep_keepon_data {
 	unsigned i2chs_keepon:1;
 };
 
+struct bck_reg_mode_data {
+	mode_t mode[TPS65910_BCK_COUNT];
+};
+
 /**
  * struct tps65910_board
  * Board platform data may be used to initialize regulators.
@@ -736,6 +742,7 @@ struct tps65910_board {
 	struct regulator_init_data *tps65910_pmic_init_data;
 	bool en_dev_slp;
 	struct tps65910_sleep_keepon_data *slp_keepon;
+	struct bck_reg_mode_data *bck_reg_modes;
 };
 
 /**
@@ -775,5 +782,8 @@ void tps65910_gpio_init(struct tps65910 *tps65910, int gpio_base);
 int tps65910_irq_init(struct tps65910 *tps65910, int irq,
 		struct tps65910_platform_data *pdata);
 int tps65910_irq_exit(struct tps65910 *tps65910);
+
+int tps65910_bck_init(struct tps65910 *tps65910, struct bck_reg_mode_data *bck_reg_modes);
+int tps65910_bck_exit(struct tps65910 *tps65910);
 
 #endif /*  __LINUX_MFD_TPS65910_H */

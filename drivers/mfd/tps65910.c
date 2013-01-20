@@ -281,8 +281,15 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 
 #endif
 
+	ret = tps65910_bck_init(tps65910,pmic_plat_data->bck_reg_modes);
+	if (ret < 0)
+		goto err_bck;
+
 	kfree(init_data);
 	return ret;
+
+err_bck:
+	mfd_remove_devices(tps65910->dev);
 
 err_dev_attr:
 	tps65910_irq_exit(tps65910);
@@ -297,6 +304,8 @@ err:
 static int tps65910_i2c_remove(struct i2c_client *i2c)
 {
 	struct tps65910 *tps65910 = i2c_get_clientdata(i2c);
+
+	tps65910_bck_exit(tps65910);
 
 	mfd_remove_devices(tps65910->dev);
 	tps65910_irq_exit(tps65910);

@@ -671,6 +671,8 @@ static int emac_get_settings(struct net_device *ndev,
 			     struct ethtool_cmd *ecmd)
 {
 	struct emac_priv *priv = netdev_priv(ndev);
+	if (!priv->phydev)
+		return -ENODEV;
 	if (priv->phy_mask)
 		return phy_ethtool_gset(priv->phydev, ecmd);
 	else

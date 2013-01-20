@@ -834,7 +834,7 @@ struct gpio_name_t gpios[] = {
 		{181,0,"gpt11-pwm-evt"},
 		{180,0,"gpt10-pwm-evt"},
 		{160,1,"msbsp-clks"},
-		{-EINVAL,NULL}
+		{-EINVAL,0,NULL}
 };
 
 static int get_audio_gpios(void) {

@@ -131,14 +131,14 @@ static struct mtd_partition scepter_nand_partitions[] = {
 #endif
 	},
 	{
-		.name           = "cfg",
+		.name           = "config",
 		.offset         = MTDPART_OFS_APPEND,
-		.size           = 160 * (SZ_128K),
+		.size           = 80 * (SZ_128K),
 	},
 	{
 		.name           = "cache",
 		.offset         = MTDPART_OFS_APPEND,
-		.size           = 160 * (SZ_128K),
+		.size           = 240 * (SZ_128K),
 	},
 	{
 		.name           = "rootfs",

@@ -1,11 +1,11 @@
---- scepter_defconfig	2013-01-09 12:19:57.354890631 -0800
-+++ scepter_defconfig	2013-01-09 12:21:33.370885717 -0800
+--- scepter_defconfig	2013-02-04 19:02:01.638550010 -0800
++++ scepter_defconfig	2013-02-04 19:02:56.482547204 -0800
 @@ -35,7 +35,7 @@
  CONFIG_BROKEN_ON_SMP=y
  CONFIG_LOCK_KERNEL=y
  CONFIG_INIT_ENV_ARG_LIMIT=32
--CONFIG_LOCALVERSION="-production"
-+CONFIG_LOCALVERSION="-debug"
+-CONFIG_LOCALVERSION="-sst1-production"
++CONFIG_LOCALVERSION="-sst2-debug"
  CONFIG_LOCALVERSION_AUTO=y
  CONFIG_HAVE_KERNEL_GZIP=y
  CONFIG_HAVE_KERNEL_LZO=y
@@ -258,7 +258,7 @@
  CONFIG_JBD2=y
  # CONFIG_JBD2_DEBUG is not set
  CONFIG_FS_MBCACHE=y
-@@ -1597,7 +1684,28 @@
+@@ -1596,7 +1683,28 @@
  # CONFIG_SYSV_FS is not set
  # CONFIG_UFS_FS is not set
  # CONFIG_PRAMFS is not set
@@ -288,7 +288,7 @@
  
  #
  # Partition Types
-@@ -1665,11 +1773,11 @@
+@@ -1664,11 +1772,11 @@
  #
  # Kernel hacking
  #
@@ -303,7 +303,7 @@
  CONFIG_FRAME_WARN=1024
  CONFIG_MAGIC_SYSRQ=y
  # CONFIG_STRIP_ASM_SYMS is not set
-@@ -1677,33 +1785,37 @@
+@@ -1676,33 +1784,37 @@
  CONFIG_DEBUG_FS=y
  # CONFIG_HEADERS_CHECK is not set
  CONFIG_DEBUG_KERNEL=y
@@ -352,7 +352,7 @@
  # CONFIG_DEBUG_VM is not set
  # CONFIG_DEBUG_WRITECOUNT is not set
  # CONFIG_DEBUG_MEMORY_INIT is not set
-@@ -1711,6 +1823,7 @@
+@@ -1710,6 +1822,7 @@
  # CONFIG_DEBUG_SG is not set
  # CONFIG_DEBUG_NOTIFIERS is not set
  # CONFIG_DEBUG_CREDENTIALS is not set
@@ -360,7 +360,7 @@
  # CONFIG_BOOT_PRINTK_DELAY is not set
  # CONFIG_RCU_TORTURE_TEST is not set
  CONFIG_RCU_CPU_STALL_DETECTOR=y
-@@ -1720,21 +1833,51 @@
+@@ -1719,21 +1832,51 @@
  # CONFIG_LKDTM is not set
  # CONFIG_FAULT_INJECTION is not set
  # CONFIG_HAVE_PSRWLOCK_ASM_CALL is not set
@@ -417,7 +417,7 @@
  # CONFIG_OC_ETM is not set
  # CONFIG_DEBUG_TRACE_CLOCK is not set
  
-@@ -1852,7 +1995,7 @@
+@@ -1851,7 +1994,7 @@
  # OCF Configuration
  #
  # CONFIG_OCF_OCF is not set

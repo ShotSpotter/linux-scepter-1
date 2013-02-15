@@ -140,6 +140,7 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
  */
 static int omap_wdt_open(struct inode *inode, struct file *file)
 {
+	static int firstopened = 0;
 	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 	void __iomem *base = wdev->base;
 
@@ -147,7 +148,12 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 		return -EBUSY;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
-	printk(KERN_CRIT "omap_wdt: opened with no way out!\n");
+	if(!firstopened) {
+	  printk(KERN_CRIT "omap_wdt: first time opened with no way out!\n");
+	  firstopened=1;
+	} else {
+	  printk("omap_wdt: opened with no way out!\n");
+	}
 #endif
 
 	clk_enable(wdev->ick);    /* Enable the interface clock */
@@ -184,7 +190,7 @@ static int omap_wdt_release(struct inode *inode, struct file *file)
 	clk_disable(wdev->ick);
 	clk_disable(wdev->fck);
 #else
-	printk(KERN_CRIT "omap_wdt: Unexpected close, not stopping!\n");
+	printk("omap_wdt: Unexpected close, not stopping!\n");
 #endif
 	wdev->omap_wdt_users = 0;
 

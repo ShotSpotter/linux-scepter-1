@@ -714,6 +714,8 @@ static void __init scepter_pmic_init(void)
 	struct i2c_adapter *adapter;
 	int reg;
 
+	printk(KERN_ALERT "[tps65910] init\n", reg);
+
 	adapter = i2c_get_adapter(1);
 	if (adapter == NULL) {
 		printk(KERN_ERR "I2C adapter[1] is not available ?!\n");
@@ -724,14 +726,14 @@ static void __init scepter_pmic_init(void)
 	if (reg < 0) {
 		printk(KERN_ERR "I2C failed to read DEVCTRL_REG ?!\n");
 	} else {
-		printk("[tps65910] DEVCTRL_REG=0x%x\n", reg);
+		printk(KERN_ALERT "[tps65910] DEVCTRL_REG=0x%x\n", reg);
 	}
 
 	tps65910_write_reg(adapter, TPS65910_DEVCTRL_REG, 0x40);
 	if (reg < 0) {
 		printk(KERN_ERR "I2C failed to write DEVCTRL_REG ?!\n");
 	} else {
-		printk("[tps65910] DEVCTRL_REG=0x%x\n", reg);
+		printk(KERN_ALERT "[tps65910] DEVCTRL_REG=0x%x\n", reg);
 	}
 
 	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);

@@ -934,13 +934,14 @@ static void __init scepter_init(void)
 	if(scepter_detect_if_brd() != 0)
 		scepter_musb_init();
 
+	scepter_pmic_init();
+
 	i2c_register_board_info(1, scepter_i2c1_boardinfo,
 				ARRAY_SIZE(scepter_i2c1_boardinfo));
 
 	/* MMC init function */
 	omap2_hsmmc_init(scepter_detect_if_brd() != 0 ? mmc_if_brd : mmc_no_if_brd);
 
-	scepter_pmic_init();
 }
 
 static void __init scepter_map_io(void)

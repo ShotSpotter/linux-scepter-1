@@ -151,6 +151,7 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 	if(!firstopened) {
 	  printk(KERN_CRIT "omap_wdt: first time opened with no way out!\n");
 	  firstopened=1;
+	}
 #endif
 
 	clk_enable(wdev->ick);    /* Enable the interface clock */

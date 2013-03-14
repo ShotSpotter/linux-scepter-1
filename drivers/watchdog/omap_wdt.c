@@ -151,9 +151,6 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 	if(!firstopened) {
 	  printk(KERN_CRIT "omap_wdt: first time opened with no way out!\n");
 	  firstopened=1;
-	} else {
-	  printk(KERN_DEBUG "omap_wdt: opened with no way out!\n");
-	}
 #endif
 
 	clk_enable(wdev->ick);    /* Enable the interface clock */
@@ -189,8 +186,6 @@ static int omap_wdt_release(struct inode *inode, struct file *file)
 
 	clk_disable(wdev->ick);
 	clk_disable(wdev->fck);
-#else
-	printk(KERN_DEBUG "omap_wdt: Unexpected close, not stopping!\n");
 #endif
 	wdev->omap_wdt_users = 0;
 

@@ -259,6 +259,11 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
 
 	tps65910_set_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_DEV_ON_MASK);
 
+#ifdef CONFIG_MACH_SCEPTER
+	tps65910_clear_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_CK32K_CTRL_MASK);
+	dev_warn(tps65910->dev, "tps65910: setting external 32k clock source\n");
+#endif
+
 /*Interrupt every second*/
 #ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
 	tps65910_clear_bits(tps65910,TPS65910_DEVCTRL,DEVCTRL_RTC_PWDN_MASK | DEVCTRL_CK32K_CTRL_MASK);

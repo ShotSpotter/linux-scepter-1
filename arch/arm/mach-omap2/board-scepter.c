@@ -550,7 +550,8 @@ static struct i2c_board_info __initdata scepter_i2c3_boardinfo[] = {
 
 static int __init scepter_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 100, NULL, 0);
+	omap_register_i2c_bus(1, 100, scepter_i2c1_boardinfo,
+				ARRAY_SIZE(scepter_i2c1_boardinfo));
 	omap_register_i2c_bus(2, 100, scepter_i2c2_boardinfo,
 			ARRAY_SIZE(scepter_i2c2_boardinfo));
 	omap_register_i2c_bus(3, 100, scepter_i2c3_boardinfo,
@@ -661,90 +662,6 @@ static void __init scepter_spi_init(void)
 			  	ARRAY_SIZE(scepter_spi_board_info));
 }
 
-
-#define TPS65910_DEVCTRL_REG	0x3F
-#define TPS65910_I2C_ADDRESS	0x2D
-
-static int tps65910_read_reg(struct i2c_adapter *adapter, u8 addr)
-{
-	struct i2c_msg msg[2];
-	u8 data[2];
-	int ret;
-
-	msg[0].addr = TPS65910_I2C_ADDRESS;
-	msg[0].flags = 0;
-	msg[0].len = 1;
-	data[0] = addr;
-	msg[0].buf = data;
-	msg[1].addr = TPS65910_I2C_ADDRESS;
-	msg[1].flags = I2C_M_RD;
-	msg[1].len = 1;
-	msg[1].buf = data;
-
-	ret = i2c_transfer(adapter, msg, 2);
-	if (ret < 0)
-		return ret;
-	else
-		return data[0];
-}
-
-static int tps65910_write_reg(struct i2c_adapter *adapter, u8 addr, u8 val)
-{
-	struct i2c_msg msg[1];
-	u8 data[2];
-	int ret;
-
-	msg[0].addr = TPS65910_I2C_ADDRESS;
-	msg[0].flags = 0;
-	msg[0].len = 2;
-	data[0] = addr;
-	data[1] = val;
-	msg[0].buf = data;
-
-	ret = i2c_transfer(adapter, msg, 1);
-	if (ret < 0)
-		return ret;
-	else
-		return data[0];
-}
-
-
-static void __init scepter_pmic_init(void)
-{
-	struct i2c_adapter *adapter;
-	int reg;
-
-	printk(KERN_ALERT "[tps65910] init\n", reg);
-
-	adapter = i2c_get_adapter(1);
-	if (adapter == NULL) {
-		printk(KERN_ERR "I2C adapter[1] is not available ?!\n");
-		return;
-	}
-
-	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);
-	if (reg < 0) {
-		printk(KERN_ERR "I2C failed to read DEVCTRL_REG ?!\n");
-	} else {
-		printk(KERN_ALERT "[tps65910] DEVCTRL_REG=0x%x\n", reg);
-	}
-
-	tps65910_write_reg(adapter, TPS65910_DEVCTRL_REG, 0x40);
-	if (reg < 0) {
-		printk(KERN_ERR "I2C failed to write DEVCTRL_REG ?!\n");
-	} else {
-		printk(KERN_ALERT "[tps65910] DEVCTRL_REG=0x%x\n", reg);
-	}
-
-	reg = tps65910_read_reg(adapter, TPS65910_DEVCTRL_REG);
-	if (reg < 0) {
-		printk(KERN_ERR "I2C failed to read DEVCTRL_REG ?!\n");
-	} else {
-		printk("[tps65910] Post DEVCTRL_REG=0x%x\n", reg);
-	}
-
-	i2c_put_adapter(adapter);
-}
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type         = MUSB_INTERFACE_ULPI,
@@ -934,10 +851,6 @@ static void __init scepter_init(void)
 	if(scepter_detect_if_brd() != 0)
 		scepter_musb_init();
 
-	scepter_pmic_init();
-
-	i2c_register_board_info(1, scepter_i2c1_boardinfo,
-				ARRAY_SIZE(scepter_i2c1_boardinfo));
 
 	/* MMC init function */
 	omap2_hsmmc_init(scepter_detect_if_brd() != 0 ? mmc_if_brd : mmc_no_if_brd);

@@ -54,7 +54,7 @@ static int pps_source = -1;  // holds our source id, int >=0.
 
 static void pps_gpio_scepter_echo(int source, int event, void *data)
 {
-  printk(KERN_INFO "echo %s %s for source %d",
+  printk(KERN_INFO "echo pps %s%s for source %d",
           event & PPS_CAPTUREASSERT ? "assert" : "",
           event & PPS_CAPTURECLEAR ? "clear" : "",
           source);
@@ -72,7 +72,7 @@ static struct pps_source_info pps_gpio_scepter_info = {
 static int init_kernel_pps(void)
 {
   int ret;
-  ret = pps_register_source(&pps_gpio_scepter_info, PPS_CAPTUREASSERT | PPS_CAPTURECLEAR | PPS_CANWAIT | PPS_ECHOASSERT | PPS_TSFMT_TSPEC);
+  ret = pps_register_source(&pps_gpio_scepter_info, PPS_CAPTUREASSERT | PPS_CAPTURECLEAR | PPS_CANWAIT | PPS_TSFMT_TSPEC);
   if (ret < 0) {
     printk(KERN_ERR "Cannot register kernel pps source! (err %d)", ret);
     return ret;
@@ -97,7 +97,7 @@ static void pps_gpio_scepter_event(int source, int rising_edge)
   getnstimeofday(&__ts);
 
   // jiffies and HZ are linux globals
-  printk(KERN_NOTICE "PPS event at %lu, value %d", jiffies, rising_edge);
+  //printk(KERN_DEBUG "PPS event at %lu, value %d", jiffies, rising_edge);
 
   /* ... and translate it to PPS time data struct */
   ts.sec = __ts.tv_sec;

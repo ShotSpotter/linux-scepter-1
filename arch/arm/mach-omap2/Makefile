@@ -189,7 +189,8 @@ obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o \
 
 obj-$(CONFIG_MACH_SCEPTER)		+= board-scepter.o \
 					   board-scepter-gpio.o \
-					   hsmmc.o
+					   hsmmc.o \
+					   board-scepter-pps.o
 
 # Platform specific device init code
 obj-y					+= usb-musb.o

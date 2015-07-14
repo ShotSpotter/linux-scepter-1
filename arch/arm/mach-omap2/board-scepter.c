@@ -57,6 +57,7 @@
 #include "hsmmc.h"
 #include "mux.h"
 
+
 static char* part_num = "";
 module_param(part_num, charp, 0444);
 
@@ -736,74 +737,6 @@ const struct scepter_part_t scepter_part_list[] =
 		{ .part = NULL},
 };
 
-#ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
-
-struct gpio_name_t {
-	int gpio;
-	int hitjustonce;
-	const char* name;
-};
-
-
-static irqreturn_t audio_gpio_interrupt(int irq, void *dev_id)
-{
-	struct gpio_name_t *gpn = (struct gpio_name_t *)dev_id;
-	if(gpn->hitjustonce) {
-		disable_irq_nosync(irq);
-	}
-	return IRQ_HANDLED;
-}
-
-struct gpio_name_t gpios[] = {
-		{181,0,"gpt11-pwm-evt"},
-		{180,0,"gpt10-pwm-evt"},
-		{160,1,"msbsp-clks"},
-		{-EINVAL,0,NULL}
-};
-
-static int get_audio_gpios(void) {
-	int i,j;
-	int irq;
-	int ret = 0;
-
-	for(i=0; gpios[i].gpio != -EINVAL; i++) {
-		struct gpio_name_t* gpn = &(gpios[i]);
-		ret = omap_mux_init_gpio(gpn->gpio,OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE4);
-		if (ret){
-			printk(KERN_ERR "could not change pin mux for %d",gpn->gpio);
-			goto bad_gpio;
-		}
-		ret = gpio_request(gpn->gpio,gpn->name);
-		if(ret){
-			printk(KERN_ERR "could not get gpio %d",gpn->gpio);
-			goto bad_gpio;
-		}
-		gpio_direction_input(gpn->gpio);
-		irq = gpio_to_irq(gpn->gpio);
-		printk(KERN_ERR "gpio %d irq %d",gpn->gpio,irq);
-
-		ret = request_irq(irq,audio_gpio_interrupt,IRQF_TRIGGER_RISING,gpn->name, gpn);
-		if(ret) {
-			printk(KERN_ERR "could not request irq for %d",gpn->gpio);
-			goto bad_irq;
-		}
-	}
-
-	return ret;
-
-bad_irq:
-	for(j=0; j <= i; j++) {
-		gpio_free(gpios[j].gpio);
-	}
-
-bad_gpio:
-	for(j=0; j < i; j++) {
-		free_irq(gpio_to_irq(gpios[j].gpio),NULL);
-	}
-
-	return ret;
-}
-#endif
 
 static void __init scepter_part_init(void)
 {
@@ -826,35 +759,39 @@ static void __init scepter_part_init(void)
 
 	if(spart->cell_init)
 		spart->cell_init();
-
-#ifdef CONFIG_MACH_SCEPTER_BOARD_TEST
-	get_audio_gpios();
-#endif
 }
 
 extern int scepter_detect_if_brd(void);
 
 static void __init scepter_init(void)
 {
+    printk(KERN_NOTICE "init mux");
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-
+    printk(KERN_NOTICE "scepter part_init");
 	scepter_part_init();
-
+    printk(KERN_NOTICE "scepter i2c_init");
 	scepter_i2c_init();
+    printk(KERN_NOTICE "scpeter_devices");
+
 	platform_add_devices(scepter_devices,
 				ARRAY_SIZE(scepter_devices));
-
+    printk(KERN_NOTICE "scepter spi_init");
 	scepter_spi_init();
+    printk(KERN_NOTICE "scepter omap_serial_init");
 	omap_serial_init();
+    printk(KERN_NOTICE "scepter flash_init");
 	scepter_flash_init();
 
-	if(scepter_detect_if_brd() != 0)
-		scepter_musb_init();
-
-
 	/* MMC init function */
-	omap2_hsmmc_init(scepter_detect_if_brd() != 0 ? mmc_if_brd : mmc_no_if_brd);
-
+	if (scepter_detect_if_brd() != 0) {
+      printk(KERN_NOTICE "mmc detected, initializing...");
+	  scepter_musb_init();
+      omap2_hsmmc_init(mmc_if_brd);
+    } else {
+      printk(KERN_NOTICE "No mmc detected.");
+      omap2_hsmmc_init(mmc_no_if_brd);
+    }
+    printk(KERN_NOTICE "scepter init complete.");
 }
 
 static void __init scepter_map_io(void)

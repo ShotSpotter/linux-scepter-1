@@ -1,10 +1,10 @@
 /*
- * linux/arch/arm/mach-omap2/board-scepter.c
+ * linux/arch/arm/mach-omap2/board-scepter-pps.c
  *
- * Copyright (C) 2012 HY Research LLC
- * Author: Hunyue Yau <hy-git@hy-research.com>
+ * Copyright (C) 2015 shotspotter inc
+ * Author: Rob Calhoun <rcalhoun@shotspotter.com>
  *
- * Based on mach-omap2/board-am3517evm.c
+ * Based on mach-omap2/board-scepter.c and sample clients in drivers/pps/clients
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as  published by the
@@ -64,7 +64,7 @@ static void pps_gpio_scepter_echo(int source, int event, void *data)
 static struct pps_source_info pps_gpio_scepter_info = {
   .name         = "scepterpps",
   .path         = "/dev/ttyS3",
-  .mode         = PPS_CAPTUREASSERT | PPS_OFFSETASSERT | PPS_ECHOASSERT | PPS_CANWAIT | PPS_TSFMT_TSPEC,
+  .mode         = PPS_CAPTUREASSERT | PPS_CAPTURECLEAR | PPS_OFFSETASSERT | PPS_ECHOASSERT | PPS_CANWAIT | PPS_TSFMT_TSPEC,
   .echo         = pps_gpio_scepter_echo,
   .owner        = THIS_MODULE,
 };
@@ -72,7 +72,7 @@ static struct pps_source_info pps_gpio_scepter_info = {
 static int init_kernel_pps(void)
 {
   int ret;
-  ret = pps_register_source(&pps_gpio_scepter_info, PPS_CAPTUREASSERT | PPS_OFFSETASSERT);
+  ret = pps_register_source(&pps_gpio_scepter_info, PPS_CAPTUREASSERT | PPS_CAPTURECLEAR | PPS_CANWAIT | PPS_ECHOASSERT | PPS_TSFMT_TSPEC);
   if (ret < 0) {
     printk(KERN_ERR "Cannot register kernel pps source! (err %d)", ret);
     return ret;
@@ -84,7 +84,7 @@ static int init_kernel_pps(void)
 }
 
 
-static void pps_gpio_scepter_event(int source)
+static void pps_gpio_scepter_event(int source, int rising_edge)
 {
   struct timespec __ts;
   struct pps_ktime ts;
@@ -97,14 +97,17 @@ static void pps_gpio_scepter_event(int source)
   getnstimeofday(&__ts);
 
   // jiffies and HZ are linux globals
-  printk(KERN_INFO "PPS event at %lu\n", jiffies);
+  printk(KERN_NOTICE "PPS event at %lu, value %d", jiffies, rising_edge);
 
   /* ... and translate it to PPS time data struct */
   ts.sec = __ts.tv_sec;
   ts.nsec = __ts.tv_nsec;
 
-  pps_event(source, &ts, PPS_CAPTUREASSERT, NULL);
-
+  if (rising_edge) {
+    pps_event(source, &ts, PPS_CAPTUREASSERT, NULL);
+  } else {
+    pps_event(source, &ts, PPS_CAPTURECLEAR, NULL);
+  }
 }
 
 
@@ -137,11 +140,11 @@ struct gpio_name_t gpios[] = {
 
 static irqreturn_t gps_pps_interrupt(int irq, void *dev_id)
 {
-  /*
+
   struct gpio_name_t *gpn = (struct gpio_name_t *)dev_id;
-  printk(KERN_NOTICE "Servicing gpio interrupt on device %s.",gpn->name);
-  */
-  pps_gpio_scepter_event(pps_source);
+  int rising_edge;
+  rising_edge = gpio_get_value(gpn->gpio);
+  pps_gpio_scepter_event(pps_source,rising_edge);
   return IRQ_HANDLED;
 }
 
@@ -166,7 +169,7 @@ static int init_gps_pps_gpios(void)
   gpio_direction_input(gpn->gpio);
   irq = gpio_to_irq(gpn->gpio);
   printk(KERN_ERR "Assigning gpio %d irq %d",gpn->gpio,irq);
-  ret = request_irq(irq,gps_pps_interrupt,IRQF_TRIGGER_RISING,gpn->name, gpn);
+  ret = request_irq(irq,gps_pps_interrupt,IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,gpn->name, gpn);
   if(ret) {
     printk(KERN_ERR "could not request irq for %d",gpn->gpio);
 	goto bad_irq;

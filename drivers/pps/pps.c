@@ -115,8 +115,7 @@ static long pps_cdev_ioctl(struct file *file,
 		/* Restore the read only parameters */
 		if ((params.mode & (PPS_TSFMT_TSPEC | PPS_TSFMT_NTPFP)) == 0) {
 			/* section 3.3 of RFC 2783 interpreted */
-			pr_debug("time format unspecified (%x)\n",
-								params.mode);
+			pr_debug("time format unspecified (%x)\n",params.mode);
 			pps->params.mode |= PPS_TSFMT_TSPEC;
 		}
 		if (pps->info.mode & PPS_CANWAIT)

@@ -185,7 +185,7 @@ __wrhv_data:
 __enable_mmu:
  UNWIND(.fnstart        )
  UNWIND(.cantunwind     )
-#ifdef CONFIG_ALIGNMENT_TRAP
+#if defined (CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
 	orr	r0, r0, #CR_A
 #else
 	bic	r0, r0, #CR_A

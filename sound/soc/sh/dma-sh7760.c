@@ -89,29 +89,12 @@ struct camelot_pcm {
 #define DMABRG_PREALLOC_BUFFER		32 * 1024
 #define DMABRG_PREALLOC_BUFFER_MAX	32 * 1024
 
-/* support everything the SSI supports */
-#define DMABRG_RATES	\
-	SNDRV_PCM_RATE_8000_192000
-
-#define DMABRG_FMTS	\
-	(SNDRV_PCM_FMTBIT_S8      | SNDRV_PCM_FMTBIT_U8      |	\
-	 SNDRV_PCM_FMTBIT_S16_LE  | SNDRV_PCM_FMTBIT_U16_LE  |	\
-	 SNDRV_PCM_FMTBIT_S20_3LE | SNDRV_PCM_FMTBIT_U20_3LE |	\
-	 SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_U24_3LE |	\
-	 SNDRV_PCM_FMTBIT_S32_LE  | SNDRV_PCM_FMTBIT_U32_LE)
-
 static struct snd_pcm_hardware camelot_pcm_hardware = {
 	.info = (SNDRV_PCM_INFO_MMAP |
 		SNDRV_PCM_INFO_INTERLEAVED |
 		SNDRV_PCM_INFO_BLOCK_TRANSFER |
 		SNDRV_PCM_INFO_MMAP_VALID |
 		SNDRV_PCM_INFO_BATCH),
-	.formats =	DMABRG_FMTS,
-	.rates =	DMABRG_RATES,
-	.rate_min =		8000,
-	.rate_max =		192000,
-	.channels_min =		2,
-	.channels_max =		8,		/* max of the SSI */
 	.buffer_bytes_max =	DMABRG_PERIOD_MAX,
 	.period_bytes_min =	DMABRG_PERIOD_MIN,
 	.period_bytes_max =	DMABRG_PERIOD_MAX / 2,
@@ -137,7 +120,7 @@ static void camelot_rxdma(void *data)
 static int camelot_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 	int recv = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 0:1;
 	int ret, dmairq;
 
@@ -150,7 +133,7 @@ static int camelot_pcm_open(struct snd_pcm_substream *substream)
 		ret = dmabrg_request_irq(dmairq, camelot_rxdma, cam);
 		if (unlikely(ret)) {
 			pr_debug("audio unit %d irqs already taken!\n",
-			     rtd->dai->cpu_dai->id);
+			     rtd->cpu_dai->id);
 			return -EBUSY;
 		}
 		(void)dmabrg_request_irq(dmairq + 1,camelot_rxdma, cam);
@@ -159,7 +142,7 @@ static int camelot_pcm_open(struct snd_pcm_substream *substream)
 		ret = dmabrg_request_irq(dmairq, camelot_txdma, cam);
 		if (unlikely(ret)) {
 			pr_debug("audio unit %d irqs already taken!\n",
-			     rtd->dai->cpu_dai->id);
+			     rtd->cpu_dai->id);
 			return -EBUSY;
 		}
 		(void)dmabrg_request_irq(dmairq + 1, camelot_txdma, cam);
@@ -170,7 +153,7 @@ static int camelot_pcm_open(struct snd_pcm_substream *substream)
 static int camelot_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 	int recv = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 0:1;
 	int dmairq;
 
@@ -191,7 +174,7 @@ static int camelot_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 	int recv = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 0:1;
 	int ret;
 
@@ -219,7 +202,7 @@ static int camelot_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 
 	pr_debug("PCM data: addr 0x%08ulx len %d\n",
 		 (u32)runtime->dma_addr, runtime->dma_bytes);
@@ -266,7 +249,7 @@ static inline void dmabrg_rec_dma_stop(struct camelot_pcm *cam)
 static int camelot_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 	int recv = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 0:1;
 
 	switch (cmd) {
@@ -293,7 +276,7 @@ static snd_pcm_uframes_t camelot_pos(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct camelot_pcm *cam = &cam_pcm_data[rtd->dai->cpu_dai->id];
+	struct camelot_pcm *cam = &cam_pcm_data[rtd->cpu_dai->id];
 	int recv = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 0:1;
 	unsigned long pos;
 
@@ -322,15 +305,10 @@ static struct snd_pcm_ops camelot_pcm_ops = {
 	.pointer	= camelot_pos,
 };
 
-static void camelot_pcm_free(struct snd_pcm *pcm)
+static int camelot_pcm_new(struct snd_soc_pcm_runtime *rtd)
 {
-	snd_pcm_lib_preallocate_free_for_all(pcm);
-}
+	struct snd_pcm *pcm = rtd->pcm;
 
-static int camelot_pcm_new(struct snd_card *card,
-			   struct snd_soc_dai *dai,
-			   struct snd_pcm *pcm)
-{
 	/* dont use SNDRV_DMA_TYPE_DEV, since it will oops the SH kernel
 	 * in MMAP mode (i.e. aplay -M)
 	 */
@@ -342,25 +320,32 @@ static int camelot_pcm_new(struct snd_card *card,
 	return 0;
 }
 
-struct snd_soc_platform sh7760_soc_platform = {
-	.name		= "sh7760-pcm",
-	.pcm_ops 	= &camelot_pcm_ops,
+static struct snd_soc_platform_driver sh7760_soc_platform = {
+	.ops		= &camelot_pcm_ops,
 	.pcm_new	= camelot_pcm_new,
-	.pcm_free	= camelot_pcm_free,
 };
-EXPORT_SYMBOL_GPL(sh7760_soc_platform);
 
-static int __init sh7760_soc_platform_init(void)
+static int sh7760_soc_platform_probe(struct platform_device *pdev)
 {
-	return snd_soc_register_platform(&sh7760_soc_platform);
+	return snd_soc_register_platform(&pdev->dev, &sh7760_soc_platform);
 }
-module_init(sh7760_soc_platform_init);
 
-static void __exit sh7760_soc_platform_exit(void)
+static int sh7760_soc_platform_remove(struct platform_device *pdev)
 {
-	snd_soc_unregister_platform(&sh7760_soc_platform);
+	snd_soc_unregister_platform(&pdev->dev);
+	return 0;
 }
-module_exit(sh7760_soc_platform_exit);
+
+static struct platform_driver sh7760_pcm_driver = {
+	.driver = {
+			.name = "sh7760-pcm-audio",
+	},
+
+	.probe = sh7760_soc_platform_probe,
+	.remove = sh7760_soc_platform_remove,
+};
+
+module_platform_driver(sh7760_pcm_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SH7760 Audio DMA (DMABRG) driver");

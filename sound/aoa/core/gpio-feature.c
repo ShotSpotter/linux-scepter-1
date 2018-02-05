@@ -10,8 +10,9 @@
  * registers.
  */
 
-#include <asm/pmac_feature.h>
+#include <linux/of_irq.h>
 #include <linux/interrupt.h>
+#include <asm/pmac_feature.h>
 #include "../aoa.h"
 
 /* TODO: these are lots of global variables
@@ -287,10 +288,9 @@ static void ftr_gpio_exit(struct gpio_runtime *rt)
 		free_irq(linein_detect_irq, &rt->line_in_notify);
 	if (rt->line_out_notify.gpio_private)
 		free_irq(lineout_detect_irq, &rt->line_out_notify);
-	cancel_delayed_work(&rt->headphone_notify.work);
-	cancel_delayed_work(&rt->line_in_notify.work);
-	cancel_delayed_work(&rt->line_out_notify.work);
-	flush_scheduled_work();
+	cancel_delayed_work_sync(&rt->headphone_notify.work);
+	cancel_delayed_work_sync(&rt->line_in_notify.work);
+	cancel_delayed_work_sync(&rt->line_out_notify.work);
 	mutex_destroy(&rt->headphone_notify.mutex);
 	mutex_destroy(&rt->line_in_notify.mutex);
 	mutex_destroy(&rt->line_out_notify.mutex);

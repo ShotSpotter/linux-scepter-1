@@ -95,6 +95,22 @@ extern s32 i2c_smbus_read_i2c_block_data(struct i2c_client *client,
 extern s32 i2c_smbus_write_i2c_block_data(struct i2c_client *client,
 					  u8 command, u8 length,
 					  const u8 *values);
+
+static inline s32
+i2c_smbus_read_word_swapped(const struct i2c_client *client, u8 command)
+{
+	s32 value = i2c_smbus_read_word_data(client, command);
+
+	return (value < 0) ? value : swab16(value);
+}
+
+static inline s32
+i2c_smbus_write_word_swapped(const struct i2c_client *client,
+				u8 command, u16 value)
+{
+	return i2c_smbus_write_word_data(client, command, swab16(value));
+}
+
 #endif /* I2C */
 
 /**
@@ -517,6 +533,7 @@ struct i2c_msg {
 #define I2C_FUNC_10BIT_ADDR		0x00000002
 #define I2C_FUNC_PROTOCOL_MANGLING	0x00000004 /* I2C_M_NOSTART etc. */
 #define I2C_FUNC_SMBUS_PEC		0x00000008
+#define I2C_FUNC_NOSTART		0x00000010 /* I2C_M_NOSTART */
 #define I2C_FUNC_SMBUS_BLOCK_PROC_CALL	0x00008000 /* SMBus 2.0 */
 #define I2C_FUNC_SMBUS_QUICK		0x00010000
 #define I2C_FUNC_SMBUS_READ_BYTE	0x00020000

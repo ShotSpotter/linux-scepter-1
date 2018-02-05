@@ -21,9 +21,6 @@
 #define WM8904_FLL_LRCLK         3
 #define WM8904_FLL_FREE_RUNNING  4
 
-extern struct snd_soc_dai wm8904_dai;
-extern struct snd_soc_codec_device soc_codec_dev_wm8904;
-
 /*
  * Register values.
  */
@@ -126,6 +123,7 @@ extern struct snd_soc_codec_device soc_codec_dev_wm8904;
 #define WM8904_EQ23                             0x9C
 #define WM8904_EQ24                             0x9D
 #define WM8904_CONTROL_INTERFACE_TEST_1         0xA1
+#define WM8904_ADC_TEST_0			0xC6
 #define WM8904_ANALOGUE_OUTPUT_BIAS_0           0xCC
 #define WM8904_FLL_NCO_TEST_0                   0xF7
 #define WM8904_FLL_NCO_TEST_1                   0xF8
@@ -184,39 +182,6 @@ extern struct snd_soc_codec_device soc_codec_dev_wm8904;
 #define WM8904_VMID_ENA_MASK                    0x0001  /* VMID_ENA */
 #define WM8904_VMID_ENA_SHIFT                        0  /* VMID_ENA */
 #define WM8904_VMID_ENA_WIDTH                        1  /* VMID_ENA */
-
-/*
- * R6 (0x06) - Mic Bias Control 0
- */
-#define WM8904_MICDET_THR_MASK                  0x0070  /* MICDET_THR - [6:4] */
-#define WM8904_MICDET_THR_SHIFT                      4  /* MICDET_THR - [6:4] */
-#define WM8904_MICDET_THR_WIDTH                      3  /* MICDET_THR - [6:4] */
-#define WM8904_MICSHORT_THR_MASK                0x000C  /* MICSHORT_THR - [3:2] */
-#define WM8904_MICSHORT_THR_SHIFT                    2  /* MICSHORT_THR - [3:2] */
-#define WM8904_MICSHORT_THR_WIDTH                    2  /* MICSHORT_THR - [3:2] */
-#define WM8904_MICDET_ENA                       0x0002  /* MICDET_ENA */
-#define WM8904_MICDET_ENA_MASK                  0x0002  /* MICDET_ENA */
-#define WM8904_MICDET_ENA_SHIFT                      1  /* MICDET_ENA */
-#define WM8904_MICDET_ENA_WIDTH                      1  /* MICDET_ENA */
-#define WM8904_MICBIAS_ENA                      0x0001  /* MICBIAS_ENA */
-#define WM8904_MICBIAS_ENA_MASK                 0x0001  /* MICBIAS_ENA */
-#define WM8904_MICBIAS_ENA_SHIFT                     0  /* MICBIAS_ENA */
-#define WM8904_MICBIAS_ENA_WIDTH                     1  /* MICBIAS_ENA */
-
-/*
- * R7 (0x07) - Mic Bias Control 1
- */
-#define WM8904_MIC_DET_FILTER_ENA               0x8000  /* MIC_DET_FILTER_ENA */
-#define WM8904_MIC_DET_FILTER_ENA_MASK          0x8000  /* MIC_DET_FILTER_ENA */
-#define WM8904_MIC_DET_FILTER_ENA_SHIFT             15  /* MIC_DET_FILTER_ENA */
-#define WM8904_MIC_DET_FILTER_ENA_WIDTH              1  /* MIC_DET_FILTER_ENA */
-#define WM8904_MIC_SHORT_FILTER_ENA             0x4000  /* MIC_SHORT_FILTER_ENA */
-#define WM8904_MIC_SHORT_FILTER_ENA_MASK        0x4000  /* MIC_SHORT_FILTER_ENA */
-#define WM8904_MIC_SHORT_FILTER_ENA_SHIFT           14  /* MIC_SHORT_FILTER_ENA */
-#define WM8904_MIC_SHORT_FILTER_ENA_WIDTH            1  /* MIC_SHORT_FILTER_ENA */
-#define WM8904_MICBIAS_SEL_MASK                 0x0007  /* MICBIAS_SEL - [2:0] */
-#define WM8904_MICBIAS_SEL_SHIFT                     0  /* MICBIAS_SEL - [2:0] */
-#define WM8904_MICBIAS_SEL_WIDTH                     3  /* MICBIAS_SEL - [2:0] */
 
 /*
  * R8 (0x08) - Analogue DAC 0
@@ -1200,70 +1165,6 @@ extern struct snd_soc_codec_device soc_codec_dev_wm8904;
 #define WM8904_FLL_CLK_REF_SRC_WIDTH                 2  /* FLL_CLK_REF_SRC - [1:0] */
 
 /*
- * R121 (0x79) - GPIO Control 1
- */
-#define WM8904_GPIO1_PU                         0x0020  /* GPIO1_PU */
-#define WM8904_GPIO1_PU_MASK                    0x0020  /* GPIO1_PU */
-#define WM8904_GPIO1_PU_SHIFT                        5  /* GPIO1_PU */
-#define WM8904_GPIO1_PU_WIDTH                        1  /* GPIO1_PU */
-#define WM8904_GPIO1_PD                         0x0010  /* GPIO1_PD */
-#define WM8904_GPIO1_PD_MASK                    0x0010  /* GPIO1_PD */
-#define WM8904_GPIO1_PD_SHIFT                        4  /* GPIO1_PD */
-#define WM8904_GPIO1_PD_WIDTH                        1  /* GPIO1_PD */
-#define WM8904_GPIO1_SEL_MASK                   0x000F  /* GPIO1_SEL - [3:0] */
-#define WM8904_GPIO1_SEL_SHIFT                       0  /* GPIO1_SEL - [3:0] */
-#define WM8904_GPIO1_SEL_WIDTH                       4  /* GPIO1_SEL - [3:0] */
-
-/*
- * R122 (0x7A) - GPIO Control 2
- */
-#define WM8904_GPIO2_PU                         0x0020  /* GPIO2_PU */
-#define WM8904_GPIO2_PU_MASK                    0x0020  /* GPIO2_PU */
-#define WM8904_GPIO2_PU_SHIFT                        5  /* GPIO2_PU */
-#define WM8904_GPIO2_PU_WIDTH                        1  /* GPIO2_PU */
-#define WM8904_GPIO2_PD                         0x0010  /* GPIO2_PD */
-#define WM8904_GPIO2_PD_MASK                    0x0010  /* GPIO2_PD */
-#define WM8904_GPIO2_PD_SHIFT                        4  /* GPIO2_PD */
-#define WM8904_GPIO2_PD_WIDTH                        1  /* GPIO2_PD */
-#define WM8904_GPIO2_SEL_MASK                   0x000F  /* GPIO2_SEL - [3:0] */
-#define WM8904_GPIO2_SEL_SHIFT                       0  /* GPIO2_SEL - [3:0] */
-#define WM8904_GPIO2_SEL_WIDTH                       4  /* GPIO2_SEL - [3:0] */
-
-/*
- * R123 (0x7B) - GPIO Control 3
- */
-#define WM8904_GPIO3_PU                         0x0020  /* GPIO3_PU */
-#define WM8904_GPIO3_PU_MASK                    0x0020  /* GPIO3_PU */
-#define WM8904_GPIO3_PU_SHIFT                        5  /* GPIO3_PU */
-#define WM8904_GPIO3_PU_WIDTH                        1  /* GPIO3_PU */
-#define WM8904_GPIO3_PD                         0x0010  /* GPIO3_PD */
-#define WM8904_GPIO3_PD_MASK                    0x0010  /* GPIO3_PD */
-#define WM8904_GPIO3_PD_SHIFT                        4  /* GPIO3_PD */
-#define WM8904_GPIO3_PD_WIDTH                        1  /* GPIO3_PD */
-#define WM8904_GPIO3_SEL_MASK                   0x000F  /* GPIO3_SEL - [3:0] */
-#define WM8904_GPIO3_SEL_SHIFT                       0  /* GPIO3_SEL - [3:0] */
-#define WM8904_GPIO3_SEL_WIDTH                       4  /* GPIO3_SEL - [3:0] */
-
-/*
- * R124 (0x7C) - GPIO Control 4
- */
-#define WM8904_GPI7_ENA                         0x0200  /* GPI7_ENA */
-#define WM8904_GPI7_ENA_MASK                    0x0200  /* GPI7_ENA */
-#define WM8904_GPI7_ENA_SHIFT                        9  /* GPI7_ENA */
-#define WM8904_GPI7_ENA_WIDTH                        1  /* GPI7_ENA */
-#define WM8904_GPI8_ENA                         0x0100  /* GPI8_ENA */
-#define WM8904_GPI8_ENA_MASK                    0x0100  /* GPI8_ENA */
-#define WM8904_GPI8_ENA_SHIFT                        8  /* GPI8_ENA */
-#define WM8904_GPI8_ENA_WIDTH                        1  /* GPI8_ENA */
-#define WM8904_GPIO_BCLK_MODE_ENA               0x0080  /* GPIO_BCLK_MODE_ENA */
-#define WM8904_GPIO_BCLK_MODE_ENA_MASK          0x0080  /* GPIO_BCLK_MODE_ENA */
-#define WM8904_GPIO_BCLK_MODE_ENA_SHIFT              7  /* GPIO_BCLK_MODE_ENA */
-#define WM8904_GPIO_BCLK_MODE_ENA_WIDTH              1  /* GPIO_BCLK_MODE_ENA */
-#define WM8904_GPIO_BCLK_SEL_MASK               0x000F  /* GPIO_BCLK_SEL - [3:0] */
-#define WM8904_GPIO_BCLK_SEL_SHIFT                   0  /* GPIO_BCLK_SEL - [3:0] */
-#define WM8904_GPIO_BCLK_SEL_WIDTH                   4  /* GPIO_BCLK_SEL - [3:0] */
-
-/*
  * R126 (0x7E) - Digital Pulls
  */
 #define WM8904_MCLK_PU                          0x0080  /* MCLK_PU */
@@ -1655,6 +1556,16 @@ extern struct snd_soc_codec_device soc_codec_dev_wm8904;
 #define WM8904_USER_KEY_MASK                    0x0002  /* USER_KEY */
 #define WM8904_USER_KEY_SHIFT                        1  /* USER_KEY */
 #define WM8904_USER_KEY_WIDTH                        1  /* USER_KEY */
+
+/*
+ * R198 (0xC6) - ADC Test 0
+ */
+#define WM8904_ADC_128_OSR_TST_MODE             0x0004  /* ADC_128_OSR_TST_MODE */
+#define WM8904_ADC_128_OSR_TST_MODE_SHIFT            2  /* ADC_128_OSR_TST_MODE */
+#define WM8904_ADC_128_OSR_TST_MODE_WIDTH            1  /* ADC_128_OSR_TST_MODE */
+#define WM8904_ADC_BIASX1P5                     0x0001  /* ADC_BIASX1P5 */
+#define WM8904_ADC_BIASX1P5_SHIFT                    0  /* ADC_BIASX1P5 */
+#define WM8904_ADC_BIASX1P5_WIDTH                    1  /* ADC_BIASX1P5 */
 
 /*
  * R204 (0xCC) - Analogue Output Bias 0

@@ -870,3 +870,7 @@ continue_removing:
 	pde_put(de);
 }
 EXPORT_SYMBOL(remove_proc_entry);
+void *PDE_DATA(const struct inode *inode)
+{
+	return PDE(inode)->data;
+}

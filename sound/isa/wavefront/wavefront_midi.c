@@ -47,7 +47,7 @@
  *  
  */
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/wait.h>
@@ -356,8 +356,7 @@ static void snd_wavefront_midi_output_timer(unsigned long data)
 	unsigned long flags;
 	
 	spin_lock_irqsave (&midi->virtual, flags);
-	midi->timer.expires = 1 + jiffies;
-	add_timer(&midi->timer);
+	mod_timer(&midi->timer, 1 + jiffies);
 	spin_unlock_irqrestore (&midi->virtual, flags);
 	snd_wavefront_midi_output_write(card);
 }
@@ -384,11 +383,10 @@ static void snd_wavefront_midi_output_trigger(struct snd_rawmidi_substream *subs
 	if (up) {
 		if ((midi->mode[mpu] & MPU401_MODE_OUTPUT_TRIGGER) == 0) {
 			if (!midi->istimer) {
-				init_timer(&midi->timer);
-				midi->timer.function = snd_wavefront_midi_output_timer;
-				midi->timer.data = (unsigned long) substream->rmidi->card->private_data;
-				midi->timer.expires = 1 + jiffies;
-				add_timer(&midi->timer);
+				setup_timer(&midi->timer,
+					    snd_wavefront_midi_output_timer,
+					    (unsigned long) substream->rmidi->card->private_data);
+				mod_timer(&midi->timer, 1 + jiffies);
 			}
 			midi->istimer++;
 			midi->mode[mpu] |= MPU401_MODE_OUTPUT_TRIGGER;
@@ -481,7 +479,7 @@ snd_wavefront_midi_disable_virtual (snd_wavefront_card_t *card)
 	spin_unlock_irqrestore (&card->wavefront.midi.virtual, flags);
 }
 
-int __devinit
+int
 snd_wavefront_midi_start (snd_wavefront_card_t *card)
 
 {
@@ -537,7 +535,7 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 	}
 
 	/* Turn on Virtual MIDI, but first *always* turn it off,
-	   since otherwise consectutive reloads of the driver will
+	   since otherwise consecutive reloads of the driver will
 	   never cause the hardware to generate the initial "internal" or 
 	   "external" source bytes in the MIDI data stream. This
 	   is pretty important, since the internal hardware generally will

@@ -90,7 +90,7 @@ static int snd_hrtimer_start(struct snd_timer *t)
 	struct snd_hrtimer *stime = t->private_data;
 
 	atomic_set(&stime->running, 0);
-	hrtimer_cancel(&stime->hrt);
+	hrtimer_try_to_cancel(&stime->hrt);
 	hrtimer_start(&stime->hrt, ns_to_ktime(t->sticks * resolution),
 		      HRTIMER_MODE_REL);
 	atomic_set(&stime->running, 1);
@@ -101,11 +101,12 @@ static int snd_hrtimer_stop(struct snd_timer *t)
 {
 	struct snd_hrtimer *stime = t->private_data;
 	atomic_set(&stime->running, 0);
+	hrtimer_try_to_cancel(&stime->hrt);
 	return 0;
 }
 
 static struct snd_timer_hardware hrtimer_hw = {
-	.flags =	SNDRV_TIMER_HW_AUTO,
+	.flags =	SNDRV_TIMER_HW_AUTO | SNDRV_TIMER_HW_TASKLET,
 	.open =		snd_hrtimer_open,
 	.close =	snd_hrtimer_close,
 	.start =	snd_hrtimer_start,
@@ -126,8 +127,7 @@ static int __init snd_hrtimer_init(void)
 
 	hrtimer_get_res(CLOCK_MONOTONIC, &tp);
 	if (tp.tv_sec > 0 || !tp.tv_nsec) {
-		snd_printk(KERN_ERR
-			   "snd-hrtimer: Invalid resolution %u.%09u",
+		pr_err("snd-hrtimer: Invalid resolution %u.%09u",
 			   (unsigned)tp.tv_sec, (unsigned)tp.tv_nsec);
 		return -EINVAL;
 	}

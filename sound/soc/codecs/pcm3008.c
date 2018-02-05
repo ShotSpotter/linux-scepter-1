@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/initval.h>
@@ -27,13 +28,60 @@
 
 #include "pcm3008.h"
 
-#define PCM3008_VERSION "0.2"
+static int pcm3008_dac_ev(struct snd_soc_dapm_widget *w,
+			  struct snd_kcontrol *kcontrol,
+			  int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct pcm3008_setup_data *setup = codec->dev->platform_data;
+
+	gpio_set_value_cansleep(setup->pdda_pin,
+				SND_SOC_DAPM_EVENT_ON(event));
+
+	return 0;
+}
+
+static int pcm3008_adc_ev(struct snd_soc_dapm_widget *w,
+			  struct snd_kcontrol *kcontrol,
+			  int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct pcm3008_setup_data *setup = codec->dev->platform_data;
+
+	gpio_set_value_cansleep(setup->pdad_pin,
+				SND_SOC_DAPM_EVENT_ON(event));
+
+	return 0;
+}
+
+static const struct snd_soc_dapm_widget pcm3008_dapm_widgets[] = {
+SND_SOC_DAPM_INPUT("VINL"),
+SND_SOC_DAPM_INPUT("VINR"),
+
+SND_SOC_DAPM_DAC_E("DAC", NULL, SND_SOC_NOPM, 0, 0, pcm3008_dac_ev,
+		   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+SND_SOC_DAPM_ADC_E("ADC", NULL, SND_SOC_NOPM, 0, 0, pcm3008_adc_ev,
+		   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+SND_SOC_DAPM_OUTPUT("VOUTL"),
+SND_SOC_DAPM_OUTPUT("VOUTR"),
+};
+
+static const struct snd_soc_dapm_route pcm3008_dapm_routes[] = {
+	{ "PCM3008 Capture", NULL, "ADC" },
+	{ "ADC", NULL, "VINL" },
+	{ "ADC", NULL, "VINR" },
+
+	{ "DAC", NULL, "PCM3008 Playback" },
+	{ "VOUTL", NULL, "DAC" },
+	{ "VOUTR", NULL, "DAC" },
+};
 
 #define PCM3008_RATES (SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |	\
 		       SNDRV_PCM_RATE_48000)
 
-struct snd_soc_dai pcm3008_dai = {
-	.name = "PCM3008 HiFi",
+static struct snd_soc_dai_driver pcm3008_dai = {
+	.name = "pcm3008-hifi",
 	.playback = {
 		.stream_name = "PCM3008 Playback",
 		.channels_min = 1,
@@ -49,47 +97,21 @@ struct snd_soc_dai pcm3008_dai = {
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 };
-EXPORT_SYMBOL_GPL(pcm3008_dai);
 
-static void pcm3008_gpio_free(struct pcm3008_setup_data *setup)
+static struct snd_soc_codec_driver soc_codec_dev_pcm3008 = {
+	.dapm_widgets = pcm3008_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(pcm3008_dapm_widgets),
+	.dapm_routes = pcm3008_dapm_routes,
+	.num_dapm_routes = ARRAY_SIZE(pcm3008_dapm_routes),
+};
+
+static int pcm3008_codec_probe(struct platform_device *pdev)
 {
-	gpio_free(setup->dem0_pin);
-	gpio_free(setup->dem1_pin);
-	gpio_free(setup->pdad_pin);
-	gpio_free(setup->pdda_pin);
-}
+	struct pcm3008_setup_data *setup = pdev->dev.platform_data;
+	int ret;
 
-static int pcm3008_soc_probe(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec;
-	struct pcm3008_setup_data *setup = socdev->codec_data;
-	int ret = 0;
-
-	printk(KERN_INFO "PCM3008 SoC Audio Codec %s\n", PCM3008_VERSION);
-
-	socdev->card->codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
-	if (!socdev->card->codec)
-		return -ENOMEM;
-
-	codec = socdev->card->codec;
-	mutex_init(&codec->mutex);
-
-	codec->name = "PCM3008";
-	codec->owner = THIS_MODULE;
-	codec->dai = &pcm3008_dai;
-	codec->num_dai = 1;
-	codec->write = NULL;
-	codec->read = NULL;
-	INIT_LIST_HEAD(&codec->dapm_widgets);
-	INIT_LIST_HEAD(&codec->dapm_paths);
-
-	/* Register PCMs. */
-	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
-	if (ret < 0) {
-		printk(KERN_ERR "pcm3008: failed to create pcms\n");
-		goto pcm_err;
-	}
+	if (!setup)
+		return -EINVAL;
 
 	/* DEM1  DEM0  DE-EMPHASIS_MODE
 	 * Low   Low   De-emphasis 44.1 kHz ON
@@ -99,105 +121,51 @@ static int pcm3008_soc_probe(struct platform_device *pdev)
 	 */
 
 	/* Configure DEM0 GPIO (turning OFF DAC De-emphasis). */
-	ret = gpio_request(setup->dem0_pin, "codec_dem0");
-	if (ret == 0)
-		ret = gpio_direction_output(setup->dem0_pin, 1);
+	ret = devm_gpio_request_one(&pdev->dev, setup->dem0_pin,
+				    GPIOF_OUT_INIT_HIGH, "codec_dem0");
 	if (ret != 0)
-		goto gpio_err;
+		return ret;
 
 	/* Configure DEM1 GPIO (turning OFF DAC De-emphasis). */
-	ret = gpio_request(setup->dem1_pin, "codec_dem1");
-	if (ret == 0)
-		ret = gpio_direction_output(setup->dem1_pin, 0);
+	ret = devm_gpio_request_one(&pdev->dev, setup->dem1_pin,
+				    GPIOF_OUT_INIT_LOW, "codec_dem1");
 	if (ret != 0)
-		goto gpio_err;
+		return ret;
 
 	/* Configure PDAD GPIO. */
-	ret = gpio_request(setup->pdad_pin, "codec_pdad");
-	if (ret == 0)
-		ret = gpio_direction_output(setup->pdad_pin, 1);
+	ret = devm_gpio_request_one(&pdev->dev, setup->pdad_pin,
+				    GPIOF_OUT_INIT_LOW, "codec_pdad");
 	if (ret != 0)
-		goto gpio_err;
+		return ret;
 
 	/* Configure PDDA GPIO. */
-	ret = gpio_request(setup->pdda_pin, "codec_pdda");
-	if (ret == 0)
-		ret = gpio_direction_output(setup->pdda_pin, 1);
+	ret = devm_gpio_request_one(&pdev->dev, setup->pdda_pin,
+				    GPIOF_OUT_INIT_LOW, "codec_pdda");
 	if (ret != 0)
-		goto gpio_err;
+		return ret;
 
-	return ret;
-
-gpio_err:
-	pcm3008_gpio_free(setup);
-pcm_err:
-	kfree(socdev->card->codec);
-
-	return ret;
+	return snd_soc_register_codec(&pdev->dev,
+			&soc_codec_dev_pcm3008, &pcm3008_dai, 1);
 }
 
-static int pcm3008_soc_remove(struct platform_device *pdev)
+static int pcm3008_codec_remove(struct platform_device *pdev)
 {
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec = socdev->card->codec;
-	struct pcm3008_setup_data *setup = socdev->codec_data;
-
-	if (!codec)
-		return 0;
-
-	pcm3008_gpio_free(setup);
-	snd_soc_free_pcms(socdev);
-	kfree(socdev->card->codec);
+	snd_soc_unregister_codec(&pdev->dev);
 
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int pcm3008_soc_suspend(struct platform_device *pdev, pm_message_t msg)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct pcm3008_setup_data *setup = socdev->codec_data;
+MODULE_ALIAS("platform:pcm3008-codec");
 
-	gpio_set_value(setup->pdad_pin, 0);
-	gpio_set_value(setup->pdda_pin, 0);
-
-	return 0;
-}
-
-static int pcm3008_soc_resume(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct pcm3008_setup_data *setup = socdev->codec_data;
-
-	gpio_set_value(setup->pdad_pin, 1);
-	gpio_set_value(setup->pdda_pin, 1);
-
-	return 0;
-}
-#else
-#define pcm3008_soc_suspend NULL
-#define pcm3008_soc_resume NULL
-#endif
-
-struct snd_soc_codec_device soc_codec_dev_pcm3008 = {
-	.probe = 	pcm3008_soc_probe,
-	.remove = 	pcm3008_soc_remove,
-	.suspend =	pcm3008_soc_suspend,
-	.resume =	pcm3008_soc_resume,
+static struct platform_driver pcm3008_codec_driver = {
+	.probe		= pcm3008_codec_probe,
+	.remove		= pcm3008_codec_remove,
+	.driver		= {
+		.name	= "pcm3008-codec",
+	},
 };
-EXPORT_SYMBOL_GPL(soc_codec_dev_pcm3008);
 
-static int __init pcm3008_init(void)
-{
-	return snd_soc_register_dai(&pcm3008_dai);
-}
-module_init(pcm3008_init);
-
-static void __exit pcm3008_exit(void)
-{
-	snd_soc_unregister_dai(&pcm3008_dai);
-}
-module_exit(pcm3008_exit);
+module_platform_driver(pcm3008_codec_driver);
 
 MODULE_DESCRIPTION("Soc PCM3008 driver");
 MODULE_AUTHOR("Hugo Villeneuve");

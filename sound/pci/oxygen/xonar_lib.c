@@ -56,9 +56,9 @@ static void xonar_ext_power_gpio_changed(struct oxygen *chip)
 	if (has_power != data->has_power) {
 		data->has_power = has_power;
 		if (has_power) {
-			snd_printk(KERN_NOTICE "power restored\n");
+			dev_notice(chip->card->dev, "power restored\n");
 		} else {
-			snd_printk(KERN_CRIT
+			dev_crit(chip->card->dev,
 				   "Hey! Don't unplug the power cable!\n");
 			/* TODO: stop PCMs */
 		}
@@ -104,9 +104,10 @@ int xonar_gpio_bit_switch_get(struct snd_kcontrol *ctl,
 {
 	struct oxygen *chip = ctl->private_data;
 	u16 bit = ctl->private_value;
+	bool invert = ctl->private_value & XONAR_GPIO_BIT_INVERT;
 
 	value->value.integer.value[0] =
-		!!(oxygen_read16(chip, OXYGEN_GPIO_DATA) & bit);
+		!!(oxygen_read16(chip, OXYGEN_GPIO_DATA) & bit) ^ invert;
 	return 0;
 }
 
@@ -115,12 +116,13 @@ int xonar_gpio_bit_switch_put(struct snd_kcontrol *ctl,
 {
 	struct oxygen *chip = ctl->private_data;
 	u16 bit = ctl->private_value;
+	bool invert = ctl->private_value & XONAR_GPIO_BIT_INVERT;
 	u16 old_bits, new_bits;
 	int changed;
 
 	spin_lock_irq(&chip->reg_lock);
 	old_bits = oxygen_read16(chip, OXYGEN_GPIO_DATA);
-	if (value->value.integer.value[0])
+	if (!!value->value.integer.value[0] ^ invert)
 		new_bits = old_bits | bit;
 	else
 		new_bits = old_bits & ~bit;

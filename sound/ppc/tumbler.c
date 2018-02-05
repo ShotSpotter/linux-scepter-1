@@ -31,8 +31,9 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
+#include <linux/of_irq.h>
+#include <linux/io.h>
 #include <sound/core.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
@@ -246,6 +247,7 @@ static int tumbler_set_master_volume(struct pmac_tumbler *mix)
 		snd_printk(KERN_ERR "failed to set volume \n");
 		return -EINVAL;
 	}
+	DBG("(I) succeeded to set volume (%u, %u)\n", left_vol, right_vol);
 	return 0;
 }
 
@@ -356,6 +358,7 @@ static int tumbler_set_drc(struct pmac_tumbler *mix)
 		snd_printk(KERN_ERR "failed to set DRC\n");
 		return -EINVAL;
 	}
+	DBG("(I) succeeded to set DRC (%u, %u)\n", val[0], val[1]);
 	return 0;
 }
 
@@ -392,6 +395,7 @@ static int snapper_set_drc(struct pmac_tumbler *mix)
 		snd_printk(KERN_ERR "failed to set DRC\n");
 		return -EINVAL;
 	}
+	DBG("(I) succeeded to set DRC (%u, %u)\n", val[0], val[1]);
 	return 0;
 }
 
@@ -782,7 +786,7 @@ static int snapper_set_capture_source(struct pmac_tumbler *mix)
 	if (! mix->i2c.client)
 		return -ENODEV;
 	if (mix->capture_source)
-		mix->acs = mix->acs |= 2;
+		mix->acs |= 2;
 	else
 		mix->acs &= ~2;
 	return i2c_smbus_write_byte_data(mix->i2c.client, TAS_REG_ACS, mix->acs);
@@ -791,16 +795,11 @@ static int snapper_set_capture_source(struct pmac_tumbler *mix)
 static int snapper_info_capture_source(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_info *uinfo)
 {
-	static char *texts[2] = {
+	static const char * const texts[2] = {
 		"Line", "Mic"
 	};
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = 1;
-	uinfo->value.enumerated.items = 2;
-	if (uinfo->value.enumerated.item > 1)
-		uinfo->value.enumerated.item = 1;
-	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
-	return 0;
+
+	return snd_ctl_enum_info(uinfo, 1, 2, texts);
 }
 
 static int snapper_get_capture_source(struct snd_kcontrol *kcontrol,
@@ -841,7 +840,7 @@ static int snapper_put_capture_source(struct snd_kcontrol *kcontrol,
 
 /*
  */
-static struct snd_kcontrol_new tumbler_mixers[] __devinitdata = {
+static struct snd_kcontrol_new tumbler_mixers[] = {
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Master Playback Volume",
 	  .info = tumbler_info_master_volume,
@@ -865,7 +864,7 @@ static struct snd_kcontrol_new tumbler_mixers[] __devinitdata = {
 	},
 };
 
-static struct snd_kcontrol_new snapper_mixers[] __devinitdata = {
+static struct snd_kcontrol_new snapper_mixers[] = {
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Master Playback Volume",
 	  .info = tumbler_info_master_volume,
@@ -898,7 +897,7 @@ static struct snd_kcontrol_new snapper_mixers[] __devinitdata = {
 	},
 };
 
-static struct snd_kcontrol_new tumbler_hp_sw __devinitdata = {
+static struct snd_kcontrol_new tumbler_hp_sw = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Headphone Playback Switch",
 	.info = snd_pmac_boolean_mono_info,
@@ -906,7 +905,7 @@ static struct snd_kcontrol_new tumbler_hp_sw __devinitdata = {
 	.put = tumbler_put_mute_switch,
 	.private_value = TUMBLER_MUTE_HP,
 };
-static struct snd_kcontrol_new tumbler_speaker_sw __devinitdata = {
+static struct snd_kcontrol_new tumbler_speaker_sw = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Speaker Playback Switch",
 	.info = snd_pmac_boolean_mono_info,
@@ -914,7 +913,7 @@ static struct snd_kcontrol_new tumbler_speaker_sw __devinitdata = {
 	.put = tumbler_put_mute_switch,
 	.private_value = TUMBLER_MUTE_AMP,
 };
-static struct snd_kcontrol_new tumbler_lineout_sw __devinitdata = {
+static struct snd_kcontrol_new tumbler_lineout_sw = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Line Out Playback Switch",
 	.info = snd_pmac_boolean_mono_info,
@@ -922,7 +921,7 @@ static struct snd_kcontrol_new tumbler_lineout_sw __devinitdata = {
 	.put = tumbler_put_mute_switch,
 	.private_value = TUMBLER_MUTE_LINE,
 };
-static struct snd_kcontrol_new tumbler_drc_sw __devinitdata = {
+static struct snd_kcontrol_new tumbler_drc_sw = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "DRC Switch",
 	.info = snd_pmac_boolean_mono_info,
@@ -997,7 +996,7 @@ static void device_change_handler(struct work_struct *work)
 				   chip->lineout_sw_ctl);
 		if (mix->anded_reset)
 			msleep(10);
-		check_mute(chip, &mix->amp_mute, 1, mix->auto_mute_notify,
+		check_mute(chip, &mix->amp_mute, !IS_G4DA, mix->auto_mute_notify,
 			   chip->speaker_sw_ctl);
 	} else {
 		/* unmute speaker, mute others */
@@ -1273,7 +1272,7 @@ static void tumbler_resume(struct snd_pmac *chip)
 #endif
 
 /* initialize tumbler */
-static int __devinit tumbler_init(struct snd_pmac *chip)
+static int tumbler_init(struct snd_pmac *chip)
 {
 	int irq;
 	struct pmac_tumbler *mix = chip->mixer_data;
@@ -1346,7 +1345,7 @@ static void tumbler_cleanup(struct snd_pmac *chip)
 }
 
 /* exported */
-int __devinit snd_pmac_tumbler_init(struct snd_pmac *chip)
+int snd_pmac_tumbler_init(struct snd_pmac *chip)
 {
 	int i, err;
 	struct pmac_tumbler *mix;

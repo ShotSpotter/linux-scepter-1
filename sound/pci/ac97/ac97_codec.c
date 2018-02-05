@@ -26,7 +26,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
-#include <linux/moduleparam.h>
+#include <linux/module.h>
 #include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -42,7 +42,7 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@perex.cz>");
 MODULE_DESCRIPTION("Universal interface for Audio Codec '97");
 MODULE_LICENSE("GPL");
 
-static int enable_loopback;
+static bool enable_loopback;
 
 module_param(enable_loopback, bool, 0444);
 MODULE_PARM_DESC(enable_loopback, "Enable AC97 ADC/DAC Loopback Control");
@@ -71,6 +71,12 @@ static const struct ac97_codec_id snd_ac97_codec_id_vendors[] = {
 { 0x414b4d00, 0xffffff00, "Asahi Kasei",	NULL,	NULL },
 { 0x414c4300, 0xffffff00, "Realtek",		NULL,	NULL },
 { 0x414c4700, 0xffffff00, "Realtek",		NULL,	NULL },
+/*
+ * This is an _inofficial_ Aztech Labs entry
+ * (value might differ from unknown official Aztech ID),
+ * currently used by the AC97 emulation of the almost-AC97 PCI168 card.
+ */
+{ 0x415a5400, 0xffffff00, "Aztech Labs (emulated)",	NULL,	NULL },
 { 0x434d4900, 0xffffff00, "C-Media Electronics", NULL,	NULL },
 { 0x43525900, 0xffffff00, "Cirrus Logic",	NULL,	NULL },
 { 0x43585400, 0xffffff00, "Conexant",           NULL,	NULL },
@@ -127,6 +133,7 @@ static const struct ac97_codec_id snd_ac97_codec_ids[] = {
 { 0x414c4781, 0xffffffff, "ALC658D",		NULL,	NULL }, /* already patched */
 { 0x414c4780, 0xfffffff0, "ALC658",		patch_alc655,	NULL },
 { 0x414c4790, 0xfffffff0, "ALC850",		patch_alc850,	NULL },
+{ 0x415a5401, 0xffffffff, "AZF3328",		patch_aztech_azf3328,	NULL },
 { 0x434d4941, 0xffffffff, "CMI9738",		patch_cm9738,	NULL },
 { 0x434d4961, 0xffffffff, "CMI9739",		patch_cm9739,	NULL },
 { 0x434d4969, 0xffffffff, "CMI9780",		patch_cm9780,	NULL },
@@ -168,7 +175,9 @@ static const struct ac97_codec_id snd_ac97_codec_ids[] = {
 { 0x54524106, 0xffffffff, "TR28026",		NULL,		NULL },
 { 0x54524108, 0xffffffff, "TR28028",		patch_tritech_tr28028,	NULL }, // added by xin jin [07/09/99]
 { 0x54524123, 0xffffffff, "TR28602",		NULL,		NULL }, // only guess --jk [TR28023 = eMicro EM28023 (new CT1297)]
+{ 0x54584e03, 0xffffffff, "TLV320AIC27",	NULL,		NULL },
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL,		NULL },
+{ 0x56494120, 0xfffffff0, "VIA1613",		patch_vt1613,	NULL },
 { 0x56494161, 0xffffffff, "VIA1612A",		NULL,		NULL }, // modified ICE1232 with S/PDIF
 { 0x56494170, 0xffffffff, "VIA1617A",		patch_vt1617a,	NULL }, // modified VT1616 with S/PDIF
 { 0x56494182, 0xffffffff, "VIA1618",		patch_vt1618,   NULL },
@@ -206,6 +215,12 @@ static void update_power_regs(struct snd_ac97 *ac97);
 #define ac97_is_power_save_mode(ac97) 0
 #endif
 
+#define ac97_err(ac97, fmt, args...)	\
+	dev_err((ac97)->bus->card->dev, fmt, ##args)
+#define ac97_warn(ac97, fmt, args...)	\
+	dev_warn((ac97)->bus->card->dev, fmt, ##args)
+#define ac97_dbg(ac97, fmt, args...)	\
+	dev_dbg((ac97)->bus->card->dev, fmt, ##args)
 
 /*
  *  I/O routines
@@ -292,7 +307,7 @@ EXPORT_SYMBOL(snd_ac97_write);
  * Reads a value from the given register.  This will invoke the read
  * callback directly after the register check.
  *
- * Returns the read value.
+ * Return: The read value.
  */
 unsigned short snd_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
 {
@@ -345,7 +360,7 @@ EXPORT_SYMBOL(snd_ac97_write_cache);
  * Compares the value with the register cache and updates the value
  * only when the value is changed.
  *
- * Returns 1 if the value is changed, 0 if no change, or a negative
+ * Return: 1 if the value is changed, 0 if no change, or a negative
  * code on failure.
  */
 int snd_ac97_update(struct snd_ac97 *ac97, unsigned short reg, unsigned short value)
@@ -377,7 +392,7 @@ EXPORT_SYMBOL(snd_ac97_update);
  * Updates the masked-bits on the given register only when the value
  * is changed.
  *
- * Returns 1 if the bits are changed, 0 if no change, or a negative
+ * Return: 1 if the bits are changed, 0 if no change, or a negative
  * code on failure.
  */
 int snd_ac97_update_bits(struct snd_ac97 *ac97, unsigned short reg, unsigned short mask, unsigned short value)
@@ -449,14 +464,8 @@ static int snd_ac97_info_enum_double(struct snd_kcontrol *kcontrol,
 {
 	struct ac97_enum *e = (struct ac97_enum *)kcontrol->private_value;
 	
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = e->shift_l == e->shift_r ? 1 : 2;
-	uinfo->value.enumerated.items = e->mask;
-	
-	if (uinfo->value.enumerated.item > e->mask - 1)
-		uinfo->value.enumerated.item = e->mask - 1;
-	strcpy(uinfo->value.enumerated.name, e->texts[uinfo->value.enumerated.item]);
-	return 0;
+	return snd_ctl_enum_info(uinfo, e->shift_l == e->shift_r ? 1 : 2,
+				 e->mask, e->texts);
 }
 
 static int snd_ac97_get_enum_double(struct snd_kcontrol *kcontrol,
@@ -590,9 +599,9 @@ static int snd_ac97_put_volsw(struct snd_kcontrol *kcontrol,
 	snd_ac97_page_restore(ac97, page_save);
 #ifdef CONFIG_SND_AC97_POWER_SAVE
 	/* check analog mixer power-down */
-	if ((val_mask & 0x8000) &&
+	if ((val_mask & AC97_PD_EAPD) &&
 	    (kcontrol->private_value & (1<<30))) {
-		if (val & 0x8000)
+		if (val & AC97_PD_EAPD)
 			ac97->power_up &= ~(1 << (reg>>1));
 		else
 			ac97->power_up |= 1 << (reg>>1);
@@ -1014,8 +1023,7 @@ static int snd_ac97_free(struct snd_ac97 *ac97)
 {
 	if (ac97) {
 #ifdef CONFIG_SND_AC97_POWER_SAVE
-		cancel_delayed_work(&ac97->power_work);
-		flush_scheduled_work();
+		cancel_delayed_work_sync(&ac97->power_work);
 #endif
 		snd_ac97_proc_done(ac97);
 		if (ac97->bus)
@@ -1036,20 +1044,20 @@ static int snd_ac97_dev_free(struct snd_device *device)
 
 static int snd_ac97_try_volume_mix(struct snd_ac97 * ac97, int reg)
 {
-	unsigned short val, mask = 0x8000;
+	unsigned short val, mask = AC97_MUTE_MASK_MONO;
 
 	if (! snd_ac97_valid_reg(ac97, reg))
 		return 0;
 
 	switch (reg) {
 	case AC97_MASTER_TONE:
-		return ac97->caps & 0x04 ? 1 : 0;
+		return ac97->caps & AC97_BC_BASS_TREBLE ? 1 : 0;
 	case AC97_HEADPHONE:
-		return ac97->caps & 0x10 ? 1 : 0;
+		return ac97->caps & AC97_BC_HEADPHONE ? 1 : 0;
 	case AC97_REC_GAIN_MIC:
-		return ac97->caps & 0x01 ? 1 : 0;
+		return ac97->caps & AC97_BC_DEDICATED_MIC ? 1 : 0;
 	case AC97_3D_CONTROL:
-		if (ac97->caps & 0x7c00) {
+		if (ac97->caps & AC97_BC_3D_TECH_ID_MASK) {
 			val = snd_ac97_read(ac97, reg);
 			/* if nonzero - fixed and we can't set it */
 			return val == 0;
@@ -1105,7 +1113,10 @@ static void check_volume_resolution(struct snd_ac97 *ac97, int reg, unsigned cha
 	*lo_max = *hi_max = 0;
 	for (i = 0 ; i < ARRAY_SIZE(cbit); i++) {
 		unsigned short val;
-		snd_ac97_write(ac97, reg, 0x8080 | cbit[i] | (cbit[i] << 8));
+		snd_ac97_write(
+			ac97, reg,
+			AC97_MUTE_MASK_STEREO | cbit[i] | (cbit[i] << 8)
+		);
 		/* Do the read twice due to buffers on some ac97 codecs.
 		 * e.g. The STAC9704 returns exactly what you wrote to the register
 		 * if you read it immediately. This causes the detect routine to fail.
@@ -1140,14 +1151,14 @@ static void snd_ac97_change_volume_params2(struct snd_ac97 * ac97, int reg, int 
 	unsigned short val, val1;
 
 	*max = 63;
-	val = 0x8080 | (0x20 << shift);
+	val = AC97_MUTE_MASK_STEREO | (0x20 << shift);
 	snd_ac97_write(ac97, reg, val);
 	val1 = snd_ac97_read(ac97, reg);
 	if (val != val1) {
 		*max = 31;
 	}
 	/* reset volume to zero */
-	snd_ac97_write_cache(ac97, reg, 0x8080);
+	snd_ac97_write_cache(ac97, reg, AC97_MUTE_MASK_STEREO);
 }
 
 static inline int printable(unsigned int x)
@@ -1184,16 +1195,16 @@ static int snd_ac97_cmute_new_stereo(struct snd_card *card, char *name, int reg,
 	if (! snd_ac97_valid_reg(ac97, reg))
 		return 0;
 
-	mute_mask = 0x8000;
+	mute_mask = AC97_MUTE_MASK_MONO;
 	val = snd_ac97_read(ac97, reg);
 	if (check_stereo || (ac97->flags & AC97_STEREO_MUTES)) {
 		/* check whether both mute bits work */
-		val1 = val | 0x8080;
+		val1 = val | AC97_MUTE_MASK_STEREO;
 		snd_ac97_write(ac97, reg, val1);
 		if (val1 == snd_ac97_read(ac97, reg))
-			mute_mask = 0x8080;
+			mute_mask = AC97_MUTE_MASK_STEREO;
 	}
-	if (mute_mask == 0x8080) {
+	if (mute_mask == AC97_MUTE_MASK_STEREO) {
 		struct snd_kcontrol_new tmp = AC97_DOUBLE(name, reg, 15, 7, 1, 1);
 		if (check_amix)
 			tmp.private_value |= (1 << 30);
@@ -1262,6 +1273,8 @@ static int snd_ac97_cvol_new(struct snd_card *card, char *name, int reg, unsigne
 		tmp.index = ac97->num;
 		kctl = snd_ctl_new1(&tmp, ac97);
 	}
+	if (!kctl)
+		return -ENOMEM;
 	if (reg >= AC97_PHONE && reg <= AC97_PCM)
 		set_tlv_db_scale(kctl, db_scale_5bit_12db_max);
 	else
@@ -1269,9 +1282,11 @@ static int snd_ac97_cvol_new(struct snd_card *card, char *name, int reg, unsigne
 	err = snd_ctl_add(card, kctl);
 	if (err < 0)
 		return err;
-	snd_ac97_write_cache(ac97, reg,
-			     (snd_ac97_read(ac97, reg) & 0x8080) |
-			     lo_max | (hi_max << 8));
+	snd_ac97_write_cache(
+		ac97, reg,
+		(snd_ac97_read(ac97, reg) & AC97_MUTE_MASK_STEREO)
+		| lo_max | (hi_max << 8)
+	);
 	return 0;
 }
 
@@ -1283,7 +1298,7 @@ static int snd_ac97_cmix_new_stereo(struct snd_card *card, const char *pfx,
 				    struct snd_ac97 *ac97)
 {
 	int err;
-	char name[44];
+	char name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 	unsigned char lo_max, hi_max;
 
 	if (! snd_ac97_valid_reg(ac97, reg))
@@ -1333,7 +1348,7 @@ static int snd_ac97_mixer_build(struct snd_ac97 * ac97)
 			return err;
 	}
 
-	ac97->regs[AC97_CENTER_LFE_MASTER] = 0x8080;
+	ac97->regs[AC97_CENTER_LFE_MASTER] = AC97_MUTE_MASK_STEREO;
 
 	/* build center controls */
 	if ((snd_ac97_try_volume_mix(ac97, AC97_CENTER_LFE_MASTER)) 
@@ -1411,8 +1426,12 @@ static int snd_ac97_mixer_build(struct snd_ac97 * ac97)
 			if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_pc_beep[idx], ac97))) < 0)
 				return err;
 		set_tlv_db_scale(kctl, db_scale_4bit);
-		snd_ac97_write_cache(ac97, AC97_PC_BEEP,
-				     snd_ac97_read(ac97, AC97_PC_BEEP) | 0x801e);
+		snd_ac97_write_cache(
+			ac97,
+			AC97_PC_BEEP,
+			(snd_ac97_read(ac97, AC97_PC_BEEP)
+				| AC97_MUTE_MASK_MONO | 0x001e)
+		);
 	}
 	
 	/* build Phone controls */
@@ -1546,7 +1565,7 @@ static int snd_ac97_mixer_build(struct snd_ac97 * ac97)
 	}
 
 	/* build Simulated Stereo Enhancement control */
-	if (ac97->caps & 0x0008) {
+	if (ac97->caps & AC97_BC_SIM_STEREO) {
 		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_general[AC97_GENERAL_STEREO_ENHANCEMENT], ac97))) < 0)
 			return err;
 	}
@@ -1558,7 +1577,7 @@ static int snd_ac97_mixer_build(struct snd_ac97 * ac97)
 	}
 
 	/* build Loudness control */
-	if (ac97->caps & 0x0020) {
+	if (ac97->caps & AC97_BC_LOUDNESS) {
 		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_general[AC97_GENERAL_LOUDNESS], ac97))) < 0)
 			return err;
 	}
@@ -1655,7 +1674,7 @@ static int snd_ac97_modem_build(struct snd_card *card, struct snd_ac97 * ac97)
 	int err, idx;
 
 	/*
-	printk(KERN_DEBUG "AC97_GPIO_CFG = %x\n",
+	ac97_dbg(ac97, "AC97_GPIO_CFG = %x\n",
 	       snd_ac97_read(ac97,AC97_GPIO_CFG));
 	*/
 	snd_ac97_write(ac97, AC97_GPIO_CFG, 0xffff & ~(AC97_GPIO_LINE1_OH));
@@ -1819,7 +1838,7 @@ void snd_ac97_get_name(struct snd_ac97 *ac97, unsigned int id, char *name, int m
  * snd_ac97_get_short_name - retrieve codec name
  * @ac97: the codec instance
  *
- * Returns the short identifying name of the codec.
+ * Return: The short identifying name of the codec.
  */
 const char *snd_ac97_get_short_name(struct snd_ac97 *ac97)
 {
@@ -1893,7 +1912,7 @@ static int ac97_reset_wait(struct snd_ac97 *ac97, int timeout, int with_modem)
  * The AC97 bus instance is registered as a low-level device, so you don't
  * have to release it manually.
  *
- * Returns zero if successful, or a negative error code on failure.
+ * Return: Zero if successful, or a negative error code on failure.
  */
 int snd_ac97_bus(struct snd_card *card, int num, struct snd_ac97_bus_ops *ops,
 		 void *private_data, struct snd_ac97_bus **rbus)
@@ -1945,7 +1964,7 @@ static int snd_ac97_dev_register(struct snd_device *device)
 		     ac97->bus->card->number, ac97->num,
 		     snd_ac97_get_short_name(ac97));
 	if ((err = device_register(&ac97->dev)) < 0) {
-		snd_printk(KERN_ERR "Can't register ac97 bus\n");
+		ac97_err(ac97, "Can't register ac97 bus\n");
 		ac97->dev.bus = NULL;
 		return err;
 	}
@@ -1962,7 +1981,7 @@ static int snd_ac97_dev_disconnect(struct snd_device *device)
 }
 
 /* build_ops to do nothing */
-static struct snd_ac97_build_ops null_build_ops;
+static const struct snd_ac97_build_ops null_build_ops;
 
 #ifdef CONFIG_SND_AC97_POWER_SAVE
 static void do_update_power(struct work_struct *work)
@@ -1989,7 +2008,7 @@ static void do_update_power(struct work_struct *work)
  * The ac97 instance is registered as a low-level device, so you don't
  * have to release it manually.
  *
- * Returns zero if successful, or a negative error code on failure.
+ * Return: Zero if successful, or a negative error code on failure.
  */
 int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template, struct snd_ac97 **rac97)
 {
@@ -2071,7 +2090,8 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 						      msecs_to_jiffies(500), 1);
 		}
 		if (err < 0) {
-			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
+			ac97_warn(ac97, "AC'97 %d does not respond - RESET\n",
+				 ac97->num);
 			/* proceed anyway - it's often non-critical */
 		}
 	}
@@ -2080,7 +2100,9 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 	ac97->id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	if (! (ac97->scaps & AC97_SCAP_DETECT_BY_VENDOR) &&
 	    (ac97->id == 0x00000000 || ac97->id == 0xffffffff)) {
-		snd_printk(KERN_ERR "AC'97 %d access is not valid [0x%x], removing mixer.\n", ac97->num, ac97->id);
+		ac97_err(ac97,
+			 "AC'97 %d access is not valid [0x%x], removing mixer.\n",
+			 ac97->num, ac97->id);
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
@@ -2113,7 +2135,9 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 
 	if (!ac97_is_audio(ac97) && !ac97_is_modem(ac97)) {
 		if (!(ac97->scaps & (AC97_SCAP_SKIP_AUDIO|AC97_SCAP_SKIP_MODEM)))
-			snd_printk(KERN_ERR "AC'97 %d access error (not audio or modem codec)\n", ac97->num);
+			ac97_err(ac97,
+				 "AC'97 %d access error (not audio or modem codec)\n",
+				 ac97->num);
 		snd_ac97_free(ac97);
 		return -EACCES;
 	}
@@ -2138,7 +2162,8 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 				goto __ready_ok;
 			schedule_timeout_uninterruptible(1);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk(KERN_WARNING "AC'97 %d analog subsections not ready\n", ac97->num);
+		ac97_warn(ac97,
+			  "AC'97 %d analog subsections not ready\n", ac97->num);
 	}
 
 	/* FIXME: add powerdown control */
@@ -2170,7 +2195,10 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 				goto __ready_ok;
 			schedule_timeout_uninterruptible(1);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk(KERN_WARNING "MC'97 %d converters and GPIO not ready (0x%x)\n", ac97->num, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
+		ac97_warn(ac97,
+			  "MC'97 %d converters and GPIO not ready (0x%x)\n",
+			  ac97->num,
+			  snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
 	}
 	
       __ready_ok:
@@ -2356,6 +2384,8 @@ static struct ac97_power_reg power_regs[PWIDX_SIZE] = {
  * @powerup: non-zero when power up the part
  *
  * Update the AC97 powerdown register bits of the given part.
+ *
+ * Return: Zero.
  */
 int snd_ac97_update_power(struct snd_ac97 *ac97, int reg, int powerup)
 {
@@ -2456,8 +2486,7 @@ void snd_ac97_suspend(struct snd_ac97 *ac97)
 	if (ac97->build_ops->suspend)
 		ac97->build_ops->suspend(ac97);
 #ifdef CONFIG_SND_AC97_POWER_SAVE
-	cancel_delayed_work(&ac97->power_work);
-	flush_scheduled_work();
+	cancel_delayed_work_sync(&ac97->power_work);
 #endif
 	snd_ac97_powerdown(ac97);
 }
@@ -2544,8 +2573,8 @@ void snd_ac97_resume(struct snd_ac97 *ac97)
 			schedule_timeout_uninterruptible(1);
 		} while (time_after_eq(end_time, jiffies));
 		/* FIXME: extra delay */
-		ac97->bus->ops->write(ac97, AC97_MASTER, 0x8000);
-		if (snd_ac97_read(ac97, AC97_MASTER) != 0x8000)
+		ac97->bus->ops->write(ac97, AC97_MASTER, AC97_MUTE_MASK_MONO);
+		if (snd_ac97_read(ac97, AC97_MASTER) != AC97_MUTE_MASK_MONO)
 			msleep(250);
 	} else {
 		end_time = jiffies + msecs_to_jiffies(100);
@@ -2704,7 +2733,7 @@ static int tune_ad_sharing(struct snd_ac97 *ac97)
 {
 	unsigned short scfg;
 	if ((ac97->id & 0xffffff00) != 0x41445300) {
-		snd_printk(KERN_ERR "ac97_quirk AD_SHARING is only for AD codecs\n");
+		ac97_err(ac97, "ac97_quirk AD_SHARING is only for AD codecs\n");
 		return -EINVAL;
 	}
 	/* Turn on OMS bit to route microphone to back panel */
@@ -2720,7 +2749,8 @@ AC97_SINGLE("Jack Detect", AC97_ALC650_CLOCK, 5, 1, 0);
 static int tune_alc_jack(struct snd_ac97 *ac97)
 {
 	if ((ac97->id & 0xffffff00) != 0x414c4700) {
-		snd_printk(KERN_ERR "ac97_quirk ALC_JACK is only for Realtek codecs\n");
+		ac97_err(ac97,
+			 "ac97_quirk ALC_JACK is only for Realtek codecs\n");
 		return -EINVAL;
 	}
 	snd_ac97_update_bits(ac97, 0x7a, 0x20, 0x20); /* select jack detect function */
@@ -2749,12 +2779,12 @@ static int master_mute_sw_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem
 		int rshift = (kcontrol->private_value >> 12) & 0x0f;
 		unsigned short mask;
 		if (shift != rshift)
-			mask = 0x8080;
+			mask = AC97_MUTE_MASK_STEREO;
 		else
-			mask = 0x8000;
-		snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000,
+			mask = AC97_MUTE_MASK_MONO;
+		snd_ac97_update_bits(ac97, AC97_POWERDOWN, AC97_PD_EAPD,
 				     (ac97->regs[AC97_MASTER] & mask) == mask ?
-				     0x8000 : 0);
+				     AC97_PD_EAPD : 0);
 	}
 	return err;
 }
@@ -2767,7 +2797,10 @@ static int tune_mute_led(struct snd_ac97 *ac97)
 		return -ENOENT;
 	msw->put = master_mute_sw_put;
 	snd_ac97_remove_ctl(ac97, "External Amplifier", NULL);
-	snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000, 0x8000); /* mute LED on */
+	snd_ac97_update_bits(
+		ac97, AC97_POWERDOWN,
+		AC97_PD_EAPD, AC97_PD_EAPD /* mute LED on */
+	);
 	ac97->scaps |= AC97_SCAP_EAPD_LED;
 	return 0;
 }
@@ -2782,12 +2815,12 @@ static int hp_master_mute_sw_put(struct snd_kcontrol *kcontrol,
 		int rshift = (kcontrol->private_value >> 12) & 0x0f;
 		unsigned short mask;
 		if (shift != rshift)
-			mask = 0x8080;
+			mask = AC97_MUTE_MASK_STEREO;
 		else
-			mask = 0x8000;
-		snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000,
+			mask = AC97_MUTE_MASK_MONO;
+		snd_ac97_update_bits(ac97, AC97_POWERDOWN, AC97_PD_EAPD,
 				     (ac97->regs[AC97_MASTER] & mask) == mask ?
-				     0x8000 : 0);
+				     AC97_PD_EAPD : 0);
 	}
 	return err;
 }
@@ -2803,7 +2836,10 @@ static int tune_hp_mute_led(struct snd_ac97 *ac97)
 	snd_ac97_remove_ctl(ac97, "External Amplifier", NULL);
 	snd_ac97_remove_ctl(ac97, "Headphone Playback", "Switch");
 	snd_ac97_remove_ctl(ac97, "Headphone Playback", "Volume");
-	snd_ac97_update_bits(ac97, AC97_POWERDOWN, 0x8000, 0x8000); /* mute LED on */
+	snd_ac97_update_bits(
+		ac97, AC97_POWERDOWN,
+		AC97_PD_EAPD, AC97_PD_EAPD /* mute LED on */
+	);
 	return 0;
 }
 
@@ -2863,10 +2899,11 @@ static int apply_quirk_str(struct snd_ac97 *ac97, const char *typestr)
  * headphone (true line-out) control as "Master".
  * The quirk-list must be terminated with a zero-filled entry.
  *
- * Returns zero if successful, or a negative error code on failure.
+ * Return: Zero if successful, or a negative error code on failure.
  */
 
-int snd_ac97_tune_hardware(struct snd_ac97 *ac97, struct ac97_quirk *quirk, const char *override)
+int snd_ac97_tune_hardware(struct snd_ac97 *ac97,
+			   const struct ac97_quirk *quirk, const char *override)
 {
 	int result;
 
@@ -2874,7 +2911,8 @@ int snd_ac97_tune_hardware(struct snd_ac97 *ac97, struct ac97_quirk *quirk, cons
 	if (override && strcmp(override, "-1") && strcmp(override, "default")) {
 		result = apply_quirk_str(ac97, override);
 		if (result < 0)
-			snd_printk(KERN_ERR "applying quirk type %s failed (%d)\n", override, result);
+			ac97_err(ac97, "applying quirk type %s failed (%d)\n",
+				 override, result);
 		return result;
 	}
 
@@ -2888,10 +2926,14 @@ int snd_ac97_tune_hardware(struct snd_ac97 *ac97, struct ac97_quirk *quirk, cons
 		    quirk->subdevice == (quirk->mask & ac97->subsystem_device)) {
 			if (quirk->codec_id && quirk->codec_id != ac97->id)
 				continue;
-			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
+			ac97_dbg(ac97, "ac97 quirk for %s (%04x:%04x)\n",
+				 quirk->name, ac97->subsystem_vendor,
+				 ac97->subsystem_device);
 			result = apply_quirk(ac97, quirk->type);
 			if (result < 0)
-				snd_printk(KERN_ERR "applying quirk type %d for %s failed (%d)\n", quirk->type, quirk->name, result);
+				ac97_err(ac97,
+					 "applying quirk type %d for %s failed (%d)\n",
+					 quirk->type, quirk->name, result);
 			return result;
 		}
 	}

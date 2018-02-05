@@ -249,7 +249,7 @@ struct snd_msnd {
 
 	/* State variables */
 	enum { msndClassic, msndPinnacle } type;
-	mode_t mode;
+	fmode_t mode;
 	unsigned long flags;
 #define F_RESETTING			0
 #define F_HAVEDIGITAL			1
@@ -297,12 +297,12 @@ int snd_msnd_disable_irq(struct snd_msnd *chip);
 void snd_msnd_dsp_halt(struct snd_msnd *chip, struct file *file);
 int snd_msnd_DAPQ(struct snd_msnd *chip, int start);
 int snd_msnd_DARQ(struct snd_msnd *chip, int start);
-int snd_msnd_pcm(struct snd_card *card, int device, struct snd_pcm **rpcm);
+int snd_msnd_pcm(struct snd_card *card, int device);
 
 int snd_msndmidi_new(struct snd_card *card, int device);
 void snd_msndmidi_input_read(void *mpu);
 
 void snd_msndmix_setup(struct snd_msnd *chip);
-int __devinit snd_msndmix_new(struct snd_card *card);
+int snd_msndmix_new(struct snd_card *card);
 int snd_msndmix_force_recsrc(struct snd_msnd *chip, int recsrc);
 #endif /* __MSND_H */

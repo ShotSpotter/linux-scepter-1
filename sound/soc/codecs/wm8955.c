@@ -16,22 +16,18 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/i2c.h>
-#include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/soc-dapm.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
 #include <sound/wm8955.h>
 
 #include "wm8955.h"
-
-static struct snd_soc_codec *wm8955_codec;
-struct snd_soc_codec_device soc_codec_dev_wm8955;
 
 #define WM8955_NUM_SUPPLIES 4
 static const char *wm8955_supply_names[WM8955_NUM_SUPPLIES] = {
@@ -43,8 +39,7 @@ static const char *wm8955_supply_names[WM8955_NUM_SUPPLIES] = {
 
 /* codec private data */
 struct wm8955_priv {
-	struct snd_soc_codec codec;
-	u16 reg_cache[WM8955_MAX_REGISTER + 1];
+	struct regmap *regmap;
 
 	unsigned int mclk_rate;
 
@@ -52,72 +47,86 @@ struct wm8955_priv {
 	int fs;
 
 	struct regulator_bulk_data supplies[WM8955_NUM_SUPPLIES];
-
-	struct wm8955_pdata *pdata;
 };
 
-static const u16 wm8955_reg[WM8955_MAX_REGISTER + 1] = {
-	0x0000,     /* R0 */
-	0x0000,     /* R1 */
-	0x0079,     /* R2  - LOUT1 volume */
-	0x0079,     /* R3  - ROUT1 volume */
-	0x0000,     /* R4 */
-	0x0008,     /* R5  - DAC Control */
-	0x0000,     /* R6 */
-	0x000A,     /* R7  - Audio Interface */
-	0x0000,     /* R8  - Sample Rate */
-	0x0000,     /* R9 */
-	0x00FF,     /* R10 - Left DAC volume */
-	0x00FF,     /* R11 - Right DAC volume */
-	0x000F,     /* R12 - Bass control */
-	0x000F,     /* R13 - Treble control */
-	0x0000,     /* R14 */
-	0x0000,     /* R15 - Reset */
-	0x0000,     /* R16 */
-	0x0000,     /* R17 */
-	0x0000,     /* R18 */
-	0x0000,     /* R19 */
-	0x0000,     /* R20 */
-	0x0000,     /* R21 */
-	0x0000,     /* R22 */
-	0x00C1,     /* R23 - Additional control (1) */
-	0x0000,     /* R24 - Additional control (2) */
-	0x0000,     /* R25 - Power Management (1) */
-	0x0000,     /* R26 - Power Management (2) */
-	0x0000,     /* R27 - Additional Control (3) */
-	0x0000,     /* R28 */
-	0x0000,     /* R29 */
-	0x0000,     /* R30 */
-	0x0000,     /* R31 */
-	0x0000,     /* R32 */
-	0x0000,     /* R33 */
-	0x0050,     /* R34 - Left out Mix (1) */
-	0x0050,     /* R35 - Left out Mix (2) */
-	0x0050,     /* R36 - Right out Mix (1) */
-	0x0050,     /* R37 - Right Out Mix (2) */
-	0x0050,     /* R38 - Mono out Mix (1) */
-	0x0050,     /* R39 - Mono out Mix (2) */
-	0x0079,     /* R40 - LOUT2 volume */
-	0x0079,     /* R41 - ROUT2 volume */
-	0x0079,     /* R42 - MONOOUT volume */
-	0x0000,     /* R43 - Clocking / PLL */
-	0x0103,     /* R44 - PLL Control 1 */
-	0x0024,     /* R45 - PLL Control 2 */
-	0x01BA,     /* R46 - PLL Control 3 */
-	0x0000,     /* R47 */
-	0x0000,     /* R48 */
-	0x0000,     /* R49 */
-	0x0000,     /* R50 */
-	0x0000,     /* R51 */
-	0x0000,     /* R52 */
-	0x0000,     /* R53 */
-	0x0000,     /* R54 */
-	0x0000,     /* R55 */
-	0x0000,     /* R56 */
-	0x0000,     /* R57 */
-	0x0000,     /* R58 */
-	0x0000,     /* R59 - PLL Control 4 */
+static const struct reg_default wm8955_reg_defaults[] = {
+	{ 2,  0x0079 },     /* R2  - LOUT1 volume */
+	{ 3,  0x0079 },     /* R3  - ROUT1 volume */
+	{ 5,  0x0008 },     /* R5  - DAC Control */
+	{ 7,  0x000A },     /* R7  - Audio Interface */
+	{ 8,  0x0000 },     /* R8  - Sample Rate */
+	{ 10, 0x00FF },     /* R10 - Left DAC volume */
+	{ 11, 0x00FF },     /* R11 - Right DAC volume */
+	{ 12, 0x000F },     /* R12 - Bass control */
+	{ 13, 0x000F },     /* R13 - Treble control */
+	{ 23, 0x00C1 },     /* R23 - Additional control (1) */
+	{ 24, 0x0000 },     /* R24 - Additional control (2) */
+	{ 25, 0x0000 },     /* R25 - Power Management (1) */
+	{ 26, 0x0000 },     /* R26 - Power Management (2) */
+	{ 27, 0x0000 },     /* R27 - Additional Control (3) */
+	{ 34, 0x0050 },     /* R34 - Left out Mix (1) */
+	{ 35, 0x0050 },     /* R35 - Left out Mix (2) */
+	{ 36, 0x0050 },     /* R36 - Right out Mix (1) */
+	{ 37, 0x0050 },     /* R37 - Right Out Mix (2) */
+	{ 38, 0x0050 },     /* R38 - Mono out Mix (1) */
+	{ 39, 0x0050 },     /* R39 - Mono out Mix (2) */
+	{ 40, 0x0079 },     /* R40 - LOUT2 volume */
+	{ 41, 0x0079 },     /* R41 - ROUT2 volume */
+	{ 42, 0x0079 },     /* R42 - MONOOUT volume */
+	{ 43, 0x0000 },     /* R43 - Clocking / PLL */
+	{ 44, 0x0103 },     /* R44 - PLL Control 1 */
+	{ 45, 0x0024 },     /* R45 - PLL Control 2 */
+	{ 46, 0x01BA },     /* R46 - PLL Control 3 */
+	{ 59, 0x0000 },     /* R59 - PLL Control 4 */
 };
+
+static bool wm8955_writeable(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case WM8955_LOUT1_VOLUME:
+	case WM8955_ROUT1_VOLUME:
+	case WM8955_DAC_CONTROL:
+	case WM8955_AUDIO_INTERFACE:
+	case WM8955_SAMPLE_RATE:
+	case WM8955_LEFT_DAC_VOLUME:
+	case WM8955_RIGHT_DAC_VOLUME:
+	case WM8955_BASS_CONTROL:
+	case WM8955_TREBLE_CONTROL:
+	case WM8955_RESET:
+	case WM8955_ADDITIONAL_CONTROL_1:
+	case WM8955_ADDITIONAL_CONTROL_2:
+	case WM8955_POWER_MANAGEMENT_1:
+	case WM8955_POWER_MANAGEMENT_2:
+	case WM8955_ADDITIONAL_CONTROL_3:
+	case WM8955_LEFT_OUT_MIX_1:
+	case WM8955_LEFT_OUT_MIX_2:
+	case WM8955_RIGHT_OUT_MIX_1:
+	case WM8955_RIGHT_OUT_MIX_2:
+	case WM8955_MONO_OUT_MIX_1:
+	case WM8955_MONO_OUT_MIX_2:
+	case WM8955_LOUT2_VOLUME:
+	case WM8955_ROUT2_VOLUME:
+	case WM8955_MONOOUT_VOLUME:
+	case WM8955_CLOCKING_PLL:
+	case WM8955_PLL_CONTROL_1:
+	case WM8955_PLL_CONTROL_2:
+	case WM8955_PLL_CONTROL_3:
+	case WM8955_PLL_CONTROL_4:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool wm8955_volatile(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case WM8955_RESET:
+		return true;
+	default:
+		return false;
+	}
+}
 
 static int wm8955_reset(struct snd_soc_codec *codec)
 {
@@ -183,7 +192,7 @@ static int wm8995_pll_factors(struct device *dev,
 	return 0;
 }
 
-/* Lookup table specifiying SRATE (table 25 in datasheet); some of the
+/* Lookup table specifying SRATE (table 25 in datasheet); some of the
  * output frequencies have been rounded to the standard frequencies
  * they are intended to match where the error is slight. */
 static struct {
@@ -235,7 +244,7 @@ static struct {
 
 static int wm8955_configure_clocking(struct snd_soc_codec *codec)
 {
-	struct wm8955_priv *wm8955 = codec->private_data;
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
 	int i, ret, val;
 	int clocking = 0;
 	int srate = 0;
@@ -289,7 +298,7 @@ static int wm8955_configure_clocking(struct snd_soc_codec *codec)
 		snd_soc_update_bits(codec, WM8955_PLL_CONTROL_2,
 				    WM8955_K_17_9_MASK,
 				    (pll.k >> 9) & WM8955_K_17_9_MASK);
-		snd_soc_update_bits(codec, WM8955_PLL_CONTROL_2,
+		snd_soc_update_bits(codec, WM8955_PLL_CONTROL_3,
 				    WM8955_K_8_0_MASK,
 				    pll.k & WM8955_K_8_0_MASK);
 		if (pll.k)
@@ -324,7 +333,7 @@ static int wm8955_configure_clocking(struct snd_soc_codec *codec)
 static int wm8955_sysclk(struct snd_soc_dapm_widget *w,
 			 struct snd_kcontrol *kcontrol, int event)
 {
-	struct snd_soc_codec *codec = w->codec;
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	int ret = 0;
 
 	/* Always disable the clocks - if we're doing reconfiguration this
@@ -353,7 +362,7 @@ static int deemph_settings[] = { 0, 32000, 44100, 48000 };
 
 static int wm8955_set_deemph(struct snd_soc_codec *codec)
 {
-	struct wm8955_priv *wm8955 = codec->private_data;
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
 	int val, i, best;
 
 	/* If we're using deemphasis select the nearest available sample
@@ -381,18 +390,19 @@ static int wm8955_set_deemph(struct snd_soc_codec *codec)
 static int wm8955_get_deemph(struct snd_kcontrol *kcontrol,
 			     struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct wm8955_priv *wm8955 = codec->private_data;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
 
-	return wm8955->deemph;
+	ucontrol->value.integer.value[0] = wm8955->deemph;
+	return 0;
 }
 
 static int wm8955_put_deemph(struct snd_kcontrol *kcontrol,
 			     struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct wm8955_priv *wm8955 = codec->private_data;
-	int deemph = ucontrol->value.enumerated.item[0];
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
+	int deemph = ucontrol->value.integer.value[0];
 
 	if (deemph > 1)
 		return -EINVAL;
@@ -406,22 +416,21 @@ static const char *bass_mode_text[] = {
 	"Linear", "Adaptive",
 };
 
-static const struct soc_enum bass_mode =
-	SOC_ENUM_SINGLE(WM8955_BASS_CONTROL, 7, 2, bass_mode_text);
+static SOC_ENUM_SINGLE_DECL(bass_mode, WM8955_BASS_CONTROL, 7, bass_mode_text);
 
 static const char *bass_cutoff_text[] = {
 	"Low", "High"
 };
 
-static const struct soc_enum bass_cutoff =
-	SOC_ENUM_SINGLE(WM8955_BASS_CONTROL, 6, 2, bass_cutoff_text);
+static SOC_ENUM_SINGLE_DECL(bass_cutoff, WM8955_BASS_CONTROL, 6,
+			    bass_cutoff_text);
 
 static const char *treble_cutoff_text[] = {
 	"High", "Low"
 };
 
-static const struct soc_enum treble_cutoff =
-	SOC_ENUM_SINGLE(WM8955_TREBLE_CONTROL, 6, 2, treble_cutoff_text);
+static SOC_ENUM_SINGLE_DECL(treble_cutoff, WM8955_TREBLE_CONTROL, 2,
+			    treble_cutoff_text);
 
 static const DECLARE_TLV_DB_SCALE(digital_tlv, -12750, 50, 1);
 static const DECLARE_TLV_DB_SCALE(atten_tlv, -600, 600, 0);
@@ -534,7 +543,7 @@ SND_SOC_DAPM_OUTPUT("MONOOUT"),
 SND_SOC_DAPM_OUTPUT("OUT3"),
 };
 
-static const struct snd_soc_dapm_route wm8955_intercon[] = {
+static const struct snd_soc_dapm_route wm8955_dapm_routes[] = {
 	{ "DACL", NULL, "SYSCLK" },
 	{ "DACR", NULL, "SYSCLK" },
 
@@ -579,40 +588,26 @@ static const struct snd_soc_dapm_route wm8955_intercon[] = {
 	{ "OUT3", NULL, "OUT3 PGA" },
 };
 
-static int wm8955_add_widgets(struct snd_soc_codec *codec)
-{
-	snd_soc_add_controls(codec, wm8955_snd_controls,
-			     ARRAY_SIZE(wm8955_snd_controls));
-
-	snd_soc_dapm_new_controls(codec, wm8955_dapm_widgets,
-				  ARRAY_SIZE(wm8955_dapm_widgets));
-
-	snd_soc_dapm_add_routes(codec, wm8955_intercon,
-				ARRAY_SIZE(wm8955_intercon));
-
-	return 0;
-}
-
 static int wm8955_hw_params(struct snd_pcm_substream *substream,
 			    struct snd_pcm_hw_params *params,
 			    struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
-	struct wm8955_priv *wm8955 = codec->private_data;
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
 	int ret;
 	int wl;
 
-	switch (params_format(params)) {
-	case SNDRV_PCM_FORMAT_S16_LE:
+	switch (params_width(params)) {
+	case 16:
 		wl = 0;
 		break;
-	case SNDRV_PCM_FORMAT_S20_3LE:
+	case 20:
 		wl = 0x4;
 		break;
-	case SNDRV_PCM_FORMAT_S24_LE:
+	case 24:
 		wl = 0x8;
 		break;
-	case SNDRV_PCM_FORMAT_S32_LE:
+	case 32:
 		wl = 0xc;
 		break;
 	default:
@@ -647,7 +642,7 @@ static int wm8955_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 			     unsigned int freq, int dir)
 {
 	struct snd_soc_codec *codec = dai->codec;
-	struct wm8955_priv *priv = codec->private_data;
+	struct wm8955_priv *priv = snd_soc_codec_get_drvdata(codec);
 	int div;
 
 	switch (clk_id) {
@@ -770,8 +765,8 @@ static int wm8955_digital_mute(struct snd_soc_dai *codec_dai, int mute)
 static int wm8955_set_bias_level(struct snd_soc_codec *codec,
 				 enum snd_soc_bias_level level)
 {
-	struct wm8955_priv *wm8955 = codec->private_data;
-	int ret, i;
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
+	int ret;
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
@@ -790,7 +785,7 @@ static int wm8955_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(wm8955->supplies),
 						    wm8955->supplies);
 			if (ret != 0) {
@@ -800,18 +795,7 @@ static int wm8955_set_bias_level(struct snd_soc_codec *codec,
 				return ret;
 			}
 
-			/* Sync back cached values if they're
-			 * different from the hardware default.
-			 */
-			for (i = 0; i < ARRAY_SIZE(wm8955->reg_cache); i++) {
-				if (i == WM8955_RESET)
-					continue;
-
-				if (wm8955->reg_cache[i] == wm8955_reg[i])
-					continue;
-
-				snd_soc_write(codec, i, wm8955->reg_cache[i]);
-			}
+			regcache_sync(wm8955->regmap);
 
 			/* Enable VREF and VMID */
 			snd_soc_update_bits(codec, WM8955_POWER_MANAGEMENT_1,
@@ -854,7 +838,7 @@ static int wm8955_set_bias_level(struct snd_soc_codec *codec,
 				       wm8955->supplies);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm.bias_level = level;
 	return 0;
 }
 
@@ -863,15 +847,15 @@ static int wm8955_set_bias_level(struct snd_soc_codec *codec,
 #define WM8955_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
-static struct snd_soc_dai_ops wm8955_dai_ops = {
+static const struct snd_soc_dai_ops wm8955_dai_ops = {
 	.set_sysclk = wm8955_set_sysclk,
 	.set_fmt = wm8955_set_fmt,
 	.hw_params = wm8955_hw_params,
 	.digital_mute = wm8955_digital_mute,
 };
 
-struct snd_soc_dai wm8955_dai = {
-	.name = "WM8955",
+static struct snd_soc_dai_driver wm8955_dai = {
+	.name = "wm8955-hifi",
 	.playback = {
 		.stream_name = "Playback",
 		.channels_min = 2,
@@ -881,129 +865,28 @@ struct snd_soc_dai wm8955_dai = {
 	},
 	.ops = &wm8955_dai_ops,
 };
-EXPORT_SYMBOL_GPL(wm8955_dai);
 
-#ifdef CONFIG_PM
-static int wm8955_suspend(struct platform_device *pdev, pm_message_t state)
+static int wm8955_probe(struct snd_soc_codec *codec)
 {
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec = socdev->card->codec;
-
-	wm8955_set_bias_level(codec, SND_SOC_BIAS_OFF);
-
-	return 0;
-}
-
-static int wm8955_resume(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec = socdev->card->codec;
-
-	wm8955_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-
-	return 0;
-}
-#else
-#define wm8955_suspend NULL
-#define wm8955_resume NULL
-#endif
-
-static int wm8955_probe(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec;
-	int ret = 0;
-
-	if (wm8955_codec == NULL) {
-		dev_err(&pdev->dev, "Codec device not registered\n");
-		return -ENODEV;
-	}
-
-	socdev->card->codec = wm8955_codec;
-	codec = wm8955_codec;
-
-	/* register pcms */
-	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
-	if (ret < 0) {
-		dev_err(codec->dev, "failed to create pcms: %d\n", ret);
-		goto pcm_err;
-	}
-
-	wm8955_add_widgets(codec);
-
-	return ret;
-
-pcm_err:
-	return ret;
-}
-
-static int wm8955_remove(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-
-	snd_soc_free_pcms(socdev);
-	snd_soc_dapm_free(socdev);
-
-	return 0;
-}
-
-struct snd_soc_codec_device soc_codec_dev_wm8955 = {
-	.probe = 	wm8955_probe,
-	.remove = 	wm8955_remove,
-	.suspend = 	wm8955_suspend,
-	.resume =	wm8955_resume,
-};
-EXPORT_SYMBOL_GPL(soc_codec_dev_wm8955);
-
-static int wm8955_register(struct wm8955_priv *wm8955,
-			   enum snd_soc_control_type control)
-{
-	int ret;
-	struct snd_soc_codec *codec = &wm8955->codec;
-	int i;
-
-	if (wm8955_codec) {
-		dev_err(codec->dev, "Another WM8955 is registered\n");
-		return -EINVAL;
-	}
-
-	mutex_init(&codec->mutex);
-	INIT_LIST_HEAD(&codec->dapm_widgets);
-	INIT_LIST_HEAD(&codec->dapm_paths);
-
-	codec->private_data = wm8955;
-	codec->name = "WM8955";
-	codec->owner = THIS_MODULE;
-	codec->bias_level = SND_SOC_BIAS_OFF;
-	codec->set_bias_level = wm8955_set_bias_level;
-	codec->dai = &wm8955_dai;
-	codec->num_dai = 1;
-	codec->reg_cache_size = WM8955_MAX_REGISTER;
-	codec->reg_cache = &wm8955->reg_cache;
-
-	memcpy(codec->reg_cache, wm8955_reg, sizeof(wm8955_reg));
-
-	ret = snd_soc_codec_set_cache_io(codec, 7, 9, control);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
-		goto err;
-	}
+	struct wm8955_priv *wm8955 = snd_soc_codec_get_drvdata(codec);
+	struct wm8955_pdata *pdata = dev_get_platdata(codec->dev);
+	int ret, i;
 
 	for (i = 0; i < ARRAY_SIZE(wm8955->supplies); i++)
 		wm8955->supplies[i].supply = wm8955_supply_names[i];
 
-	ret = regulator_bulk_get(codec->dev, ARRAY_SIZE(wm8955->supplies),
+	ret = devm_regulator_bulk_get(codec->dev, ARRAY_SIZE(wm8955->supplies),
 				 wm8955->supplies);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to request supplies: %d\n", ret);
-		goto err;
+		return ret;
 	}
 
 	ret = regulator_bulk_enable(ARRAY_SIZE(wm8955->supplies),
 				    wm8955->supplies);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to enable supplies: %d\n", ret);
-		goto err_get;
+		return ret;
 	}
 
 	ret = wm8955_reset(codec);
@@ -1012,29 +895,38 @@ static int wm8955_register(struct wm8955_priv *wm8955,
 		goto err_enable;
 	}
 
-	wm8955_dai.dev = codec->dev;
-
 	/* Change some default settings - latch VU and enable ZC */
-	wm8955->reg_cache[WM8955_LEFT_DAC_VOLUME] |= WM8955_LDVU;
-	wm8955->reg_cache[WM8955_RIGHT_DAC_VOLUME] |= WM8955_RDVU;
-	wm8955->reg_cache[WM8955_LOUT1_VOLUME] |= WM8955_LO1VU | WM8955_LO1ZC;
-	wm8955->reg_cache[WM8955_ROUT1_VOLUME] |= WM8955_RO1VU | WM8955_RO1ZC;
-	wm8955->reg_cache[WM8955_LOUT2_VOLUME] |= WM8955_LO2VU | WM8955_LO2ZC;
-	wm8955->reg_cache[WM8955_ROUT2_VOLUME] |= WM8955_RO2VU | WM8955_RO2ZC;
-	wm8955->reg_cache[WM8955_MONOOUT_VOLUME] |= WM8955_MOZC;
+	snd_soc_update_bits(codec, WM8955_LEFT_DAC_VOLUME,
+			    WM8955_LDVU, WM8955_LDVU);
+	snd_soc_update_bits(codec, WM8955_RIGHT_DAC_VOLUME,
+			    WM8955_RDVU, WM8955_RDVU);
+	snd_soc_update_bits(codec, WM8955_LOUT1_VOLUME,
+			    WM8955_LO1VU | WM8955_LO1ZC,
+			    WM8955_LO1VU | WM8955_LO1ZC);
+	snd_soc_update_bits(codec, WM8955_ROUT1_VOLUME,
+			    WM8955_RO1VU | WM8955_RO1ZC,
+			    WM8955_RO1VU | WM8955_RO1ZC);
+	snd_soc_update_bits(codec, WM8955_LOUT2_VOLUME,
+			    WM8955_LO2VU | WM8955_LO2ZC,
+			    WM8955_LO2VU | WM8955_LO2ZC);
+	snd_soc_update_bits(codec, WM8955_ROUT2_VOLUME,
+			    WM8955_RO2VU | WM8955_RO2ZC,
+			    WM8955_RO2VU | WM8955_RO2ZC);
+	snd_soc_update_bits(codec, WM8955_MONOOUT_VOLUME,
+			    WM8955_MOZC, WM8955_MOZC);
 
 	/* Also enable adaptive bass boost by default */
-	wm8955->reg_cache[WM8955_BASS_CONTROL] |= WM8955_BB;
+	snd_soc_update_bits(codec, WM8955_BASS_CONTROL, WM8955_BB, WM8955_BB);
 
 	/* Set platform data values */
-	if (wm8955->pdata) {
-		if (wm8955->pdata->out2_speaker)
-			wm8955->reg_cache[WM8955_ADDITIONAL_CONTROL_2]
-				|= WM8955_ROUT2INV;
+	if (pdata) {
+		if (pdata->out2_speaker)
+			snd_soc_update_bits(codec, WM8955_ADDITIONAL_CONTROL_2,
+					    WM8955_ROUT2INV, WM8955_ROUT2INV);
 
-		if (wm8955->pdata->monoin_diff)
-			wm8955->reg_cache[WM8955_MONO_OUT_MIX_1]
-				|= WM8955_DMEN;
+		if (pdata->monoin_diff)
+			snd_soc_update_bits(codec, WM8955_MONO_OUT_MIX_1,
+					    WM8955_DMEN, WM8955_DMEN);
 	}
 
 	wm8955_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
@@ -1042,69 +934,70 @@ static int wm8955_register(struct wm8955_priv *wm8955,
 	/* Bias level configuration will have done an extra enable */
 	regulator_bulk_disable(ARRAY_SIZE(wm8955->supplies), wm8955->supplies);
 
-	wm8955_codec = codec;
-
-	ret = snd_soc_register_codec(codec);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to register codec: %d\n", ret);
-		return ret;
-	}
-
-	ret = snd_soc_register_dai(&wm8955_dai);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to register DAI: %d\n", ret);
-		snd_soc_unregister_codec(codec);
-		return ret;
-	}
-
 	return 0;
 
 err_enable:
 	regulator_bulk_disable(ARRAY_SIZE(wm8955->supplies), wm8955->supplies);
-err_get:
-	regulator_bulk_free(ARRAY_SIZE(wm8955->supplies), wm8955->supplies);
-err:
-	kfree(wm8955);
 	return ret;
 }
 
-static void wm8955_unregister(struct wm8955_priv *wm8955)
-{
-	wm8955_set_bias_level(&wm8955->codec, SND_SOC_BIAS_OFF);
-	regulator_bulk_free(ARRAY_SIZE(wm8955->supplies), wm8955->supplies);
-	snd_soc_unregister_dai(&wm8955_dai);
-	snd_soc_unregister_codec(&wm8955->codec);
-	kfree(wm8955);
-	wm8955_codec = NULL;
-}
+static struct snd_soc_codec_driver soc_codec_dev_wm8955 = {
+	.probe =	wm8955_probe,
+	.set_bias_level = wm8955_set_bias_level,
+	.suspend_bias_off = true,
 
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-static __devinit int wm8955_i2c_probe(struct i2c_client *i2c,
-				      const struct i2c_device_id *id)
+	.controls =	wm8955_snd_controls,
+	.num_controls = ARRAY_SIZE(wm8955_snd_controls),
+	.dapm_widgets = wm8955_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(wm8955_dapm_widgets),
+	.dapm_routes =	wm8955_dapm_routes,
+	.num_dapm_routes = ARRAY_SIZE(wm8955_dapm_routes),
+};
+
+static const struct regmap_config wm8955_regmap = {
+	.reg_bits = 7,
+	.val_bits = 9,
+
+	.max_register = WM8955_MAX_REGISTER,
+	.volatile_reg = wm8955_volatile,
+	.writeable_reg = wm8955_writeable,
+
+	.cache_type = REGCACHE_RBTREE,
+	.reg_defaults = wm8955_reg_defaults,
+	.num_reg_defaults = ARRAY_SIZE(wm8955_reg_defaults),
+};
+
+static int wm8955_i2c_probe(struct i2c_client *i2c,
+			    const struct i2c_device_id *id)
 {
 	struct wm8955_priv *wm8955;
-	struct snd_soc_codec *codec;
+	int ret;
 
-	wm8955 = kzalloc(sizeof(struct wm8955_priv), GFP_KERNEL);
+	wm8955 = devm_kzalloc(&i2c->dev, sizeof(struct wm8955_priv),
+			      GFP_KERNEL);
 	if (wm8955 == NULL)
 		return -ENOMEM;
 
-	codec = &wm8955->codec;
-	codec->hw_write = (hw_write_t)i2c_master_send;
+	wm8955->regmap = devm_regmap_init_i2c(i2c, &wm8955_regmap);
+	if (IS_ERR(wm8955->regmap)) {
+		ret = PTR_ERR(wm8955->regmap);
+		dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
+			ret);
+		return ret;
+	}
 
 	i2c_set_clientdata(i2c, wm8955);
-	codec->control_data = i2c;
-	wm8955->pdata = i2c->dev.platform_data;
 
-	codec->dev = &i2c->dev;
+	ret = snd_soc_register_codec(&i2c->dev,
+			&soc_codec_dev_wm8955, &wm8955_dai, 1);
 
-	return wm8955_register(wm8955, SND_SOC_I2C);
+	return ret;
 }
 
-static __devexit int wm8955_i2c_remove(struct i2c_client *client)
+static int wm8955_i2c_remove(struct i2c_client *client)
 {
-	struct wm8955_priv *wm8955 = i2c_get_clientdata(client);
-	wm8955_unregister(wm8955);
+	snd_soc_unregister_codec(&client->dev);
+
 	return 0;
 }
 
@@ -1120,32 +1013,11 @@ static struct i2c_driver wm8955_i2c_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe =    wm8955_i2c_probe,
-	.remove =   __devexit_p(wm8955_i2c_remove),
+	.remove =   wm8955_i2c_remove,
 	.id_table = wm8955_i2c_id,
 };
-#endif
 
-static int __init wm8955_modinit(void)
-{
-	int ret;
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-	ret = i2c_add_driver(&wm8955_i2c_driver);
-	if (ret != 0) {
-		printk(KERN_ERR "Failed to register WM8955 I2C driver: %d\n",
-		       ret);
-	}
-#endif
-	return 0;
-}
-module_init(wm8955_modinit);
-
-static void __exit wm8955_exit(void)
-{
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-	i2c_del_driver(&wm8955_i2c_driver);
-#endif
-}
-module_exit(wm8955_exit);
+module_i2c_driver(wm8955_i2c_driver);
 
 MODULE_DESCRIPTION("ASoC WM8955 driver");
 MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");

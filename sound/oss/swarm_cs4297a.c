@@ -69,7 +69,6 @@
 #include <linux/sound.h>
 #include <linux/slab.h>
 #include <linux/soundcard.h>
-#include <linux/ac97_codec.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
 #include <linux/interrupt.h>
@@ -91,8 +90,11 @@
 #include <asm/sibyte/sb1250_mac.h>
 #include <asm/sibyte/sb1250.h>
 
+#include "sleep.h"
+
 struct cs4297a_state;
 
+static DEFINE_MUTEX(swarm_cs4297a_mutex);
 static void stop_dac(struct cs4297a_state *s);
 static void stop_adc(struct cs4297a_state *s);
 static void start_dac(struct cs4297a_state *s);
@@ -197,6 +199,22 @@ static const char invalid_magic[] =
                 return -ENXIO;                     \
         }                                          \
 })
+
+/* AC97 registers */
+#define AC97_MASTER_VOL_STEREO   0x0002      /* Line Out		*/
+#define AC97_PCBEEP_VOL          0x000a      /* none			*/
+#define AC97_PHONE_VOL           0x000c      /* TAD Input (mono)	*/
+#define AC97_MIC_VOL             0x000e      /* MIC Input (mono)	*/
+#define AC97_LINEIN_VOL          0x0010      /* Line Input (stereo)	*/
+#define AC97_CD_VOL              0x0012      /* CD Input (stereo)	*/
+#define AC97_AUX_VOL             0x0016      /* Aux Input (stereo)	*/
+#define AC97_PCMOUT_VOL          0x0018      /* Wave Output (stereo)	*/
+#define AC97_RECORD_SELECT       0x001a      /*			*/
+#define AC97_RECORD_GAIN         0x001c
+#define AC97_GENERAL_PURPOSE     0x0020
+#define AC97_3D_CONTROL          0x0022
+#define AC97_POWER_CONTROL       0x0026
+#define AC97_VENDOR_ID1           0x007c
 
 struct list_head cs4297a_devs = { &cs4297a_devs, &cs4297a_devs };
 
@@ -732,7 +750,7 @@ static int serdma_reg_access(struct cs4297a_state *s, u64 data)
                 /* Since a writer has the DSP open, we have to mux the
                    request in */
                 s->reg_request = data;
-                interruptible_sleep_on(&s->dma_dac.reg_wait);
+		oss_broken_sleep_on(&s->dma_dac.reg_wait, MAX_SCHEDULE_TIMEOUT);
                 /* XXXKW how can I deal with the starvation case where
                    the opener isn't writing? */
         } else {
@@ -774,7 +792,7 @@ static int cs4297a_read_ac97(struct cs4297a_state *s, u32 offset,
         if (serdma_reg_access(s, (0xCLL << 60) | (1LL << 47) | ((u64)(offset & 0x7F) << 40)))
                 return -1;
 
-        interruptible_sleep_on(&s->dma_adc.reg_wait);
+	oss_broken_sleep_on(&s->dma_adc.reg_wait, MAX_SCHEDULE_TIMEOUT);
         *value = s->read_value;
         CS_DBGOUT(CS_AC97, 2,
                   printk(KERN_INFO "cs4297a: rdr reg %x -> %x\n", s->read_reg, s->read_value));
@@ -874,7 +892,7 @@ static void start_adc(struct cs4297a_state *s)
 		if (s->prop_adc.fmt & AFMT_S8 || s->prop_adc.fmt & AFMT_U8) {
 			// 
 			// now only use 16 bit capture, due to truncation issue
-			// in the chip, noticable distortion occurs.
+			// in the chip, noticeable distortion occurs.
 			// allocate buffer and then convert from 16 bit to 
 			// 8 bit for the user buffer.
 			//
@@ -1534,6 +1552,7 @@ static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs4297a: cs4297a_open_mixdev()+\n"));
 
+	mutex_lock(&swarm_cs4297a_mutex);
 	list_for_each(entry, &cs4297a_devs)
 	{
 		s = list_entry(entry, struct cs4297a_state, list);
@@ -1544,6 +1563,8 @@ static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 	{
 		CS_DBGOUT(CS_FUNCTION | CS_OPEN | CS_ERROR, 2,
 			printk(KERN_INFO "cs4297a: cs4297a_open_mixdev()- -ENODEV\n"));
+
+		mutex_unlock(&swarm_cs4297a_mutex);
 		return -ENODEV;
 	}
 	VALIDATE_STATE(s);
@@ -1551,6 +1572,7 @@ static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs4297a: cs4297a_open_mixdev()- 0\n"));
+	mutex_unlock(&swarm_cs4297a_mutex);
 
 	return nonseekable_open(inode, file);
 }
@@ -1566,11 +1588,15 @@ static int cs4297a_release_mixdev(struct inode *inode, struct file *file)
 }
 
 
-static int cs4297a_ioctl_mixdev(struct inode *inode, struct file *file,
+static int cs4297a_ioctl_mixdev(struct file *file,
 			       unsigned int cmd, unsigned long arg)
 {
-	return mixer_ioctl((struct cs4297a_state *) file->private_data, cmd,
+	int ret;
+	mutex_lock(&swarm_cs4297a_mutex);
+	ret = mixer_ioctl((struct cs4297a_state *) file->private_data, cmd,
 			   arg);
+	mutex_unlock(&swarm_cs4297a_mutex);
+	return ret;
 }
 
 
@@ -1580,7 +1606,7 @@ static int cs4297a_ioctl_mixdev(struct inode *inode, struct file *file,
 static const struct file_operations cs4297a_mixer_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
-	.ioctl		= cs4297a_ioctl_mixdev,
+	.unlocked_ioctl	= cs4297a_ioctl_mixdev,
 	.open		= cs4297a_open_mixdev,
 	.release	= cs4297a_release_mixdev,
 };
@@ -1628,7 +1654,7 @@ static int drain_dac(struct cs4297a_state *s, int nonblock)
         s->dma_dac.hwptr = s->dma_dac.swptr = hwptr;
         spin_unlock_irqrestore(&s->lock, flags);
 	remove_wait_queue(&s->dma_dac.wait, &wait);
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	return 0;
 }
 
@@ -1716,7 +1742,7 @@ static ssize_t cs4297a_read(struct file *file, char *buffer, size_t count,
 			start_adc(s);
 			if (file->f_flags & O_NONBLOCK)
 				return ret ? ret : -EAGAIN;
-			interruptible_sleep_on(&s->dma_adc.wait);
+			oss_broken_sleep_on(&s->dma_adc.wait, MAX_SCHEDULE_TIMEOUT);
 			if (signal_pending(current))
 				return ret ? ret : -ERESTARTSYS;
 			continue;
@@ -1812,7 +1838,7 @@ static ssize_t cs4297a_write(struct file *file, const char *buffer,
 			start_dac(s);
 			if (file->f_flags & O_NONBLOCK)
 				return ret ? ret : -EAGAIN;
-			interruptible_sleep_on(&d->wait);
+			oss_broken_sleep_on(&d->wait, MAX_SCHEDULE_TIMEOUT);
 			if (signal_pending(current))
 				return ret ? ret : -ERESTARTSYS;
 			continue;
@@ -1944,7 +1970,7 @@ static int cs4297a_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 
-static int cs4297a_ioctl(struct inode *inode, struct file *file,
+static int cs4297a_ioctl(struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	struct cs4297a_state *s =
@@ -2337,6 +2363,16 @@ static int cs4297a_ioctl(struct inode *inode, struct file *file,
 	return mixer_ioctl(s, cmd, arg);
 }
 
+static long cs4297a_unlocked_ioctl(struct file *file, u_int cmd, u_long arg)
+{
+	int ret;
+
+	mutex_lock(&swarm_cs4297a_mutex);
+	ret = cs4297a_ioctl(file, cmd, arg);
+	mutex_unlock(&swarm_cs4297a_mutex);
+
+	return ret;
+}
 
 static int cs4297a_release(struct inode *inode, struct file *file)
 {
@@ -2369,7 +2405,7 @@ static int cs4297a_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int cs4297a_open(struct inode *inode, struct file *file)
+static int cs4297a_locked_open(struct inode *inode, struct file *file)
 {
 	int minor = iminor(inode);
 	struct cs4297a_state *s=NULL;
@@ -2418,7 +2454,7 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 			}
 			mutex_unlock(&s->open_sem_dac);
-			interruptible_sleep_on(&s->open_wait_dac);
+			oss_broken_sleep_on(&s->open_wait_dac, MAX_SCHEDULE_TIMEOUT);
 
 			if (signal_pending(current)) {
                                 printk("open - sig pending\n");
@@ -2435,7 +2471,7 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 			}
 			mutex_unlock(&s->open_sem_adc);
-			interruptible_sleep_on(&s->open_wait_adc);
+			oss_broken_sleep_on(&s->open_wait_adc, MAX_SCHEDULE_TIMEOUT);
 
 			if (signal_pending(current)) {
                                 printk("open - sig pending\n");
@@ -2486,6 +2522,16 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 	return nonseekable_open(inode, file);
 }
 
+static int cs4297a_open(struct inode *inode, struct file *file)
+{
+	int ret;
+
+	mutex_lock(&swarm_cs4297a_mutex);
+	ret = cs4297a_open(inode, file);
+	mutex_unlock(&swarm_cs4297a_mutex);
+
+	return ret;
+}
 
 // ******************************************************************************************
 //   Wave (audio) file operations struct.
@@ -2496,7 +2542,7 @@ static const struct file_operations cs4297a_audio_fops = {
 	.read		= cs4297a_read,
 	.write		= cs4297a_write,
 	.poll		= cs4297a_poll,
-	.ioctl		= cs4297a_ioctl,
+	.unlocked_ioctl	= cs4297a_unlocked_ioctl,
 	.mmap		= cs4297a_mmap,
 	.open		= cs4297a_open,
 	.release	= cs4297a_release,
@@ -2579,15 +2625,12 @@ static int __init cs4297a_init(void)
 	u32 pwr, id;
 	mm_segment_t fs;
 	int rval;
-#ifndef CONFIG_BCM_CS4297A_CSWARM
 	u64 cfg;
 	int mdio_val;
-#endif
 
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
 		"cs4297a: cs4297a_init_module()+ \n"));
 
-#ifndef CONFIG_BCM_CS4297A_CSWARM
         mdio_val = __raw_readq(KSEG1 + A_MAC_REGISTER(2, R_MAC_MDIO)) &
                 (M_MAC_MDIO_DIR|M_MAC_MDIO_OUT);
 
@@ -2613,7 +2656,6 @@ static int __init cs4297a_init(void)
         __raw_writeq(mdio_val | M_MAC_GENC, KSEG1+A_MAC_REGISTER(2, R_MAC_MDIO));
         /* Give the codec some time to finish resetting (start the bit clock) */
         udelay(100);
-#endif
 
 	if (!(s = kzalloc(sizeof(struct cs4297a_state), GFP_KERNEL))) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR

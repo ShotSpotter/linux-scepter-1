@@ -34,6 +34,7 @@ extern const char linux_proc_banner[];
 #define LLONG_MAX	((long long)(~0ULL>>1))
 #define LLONG_MIN	(-LLONG_MAX - 1)
 #define ULLONG_MAX	(~0ULL)
+#define SIZE_MAX	(~(size_t)0)
 
 #define STACK_MAGIC	0xdeadbeef
 
@@ -671,6 +672,16 @@ static inline void ftrace_dump(void) { }
 	typeof(y) _max2 = (y);			\
 	(void) (&_max1 == &_max2);		\
 	_max1 > _max2 ? _max1 : _max2; })
+
+/**
+ * min_not_zero - return the minimum that is _not_ zero, unless both are zero
+ * @x: value1
+ * @y: value2
+ */
+#define min_not_zero(x, y) ({                   \
+        typeof(x) __x = (x);                    \
+        typeof(y) __y = (y);                    \
+        __x == 0 ? __y : ((__y == 0) ? __x : min(__x, __y)); })
 
 /**
  * clamp - return a value clamped to a given range with strict typechecking

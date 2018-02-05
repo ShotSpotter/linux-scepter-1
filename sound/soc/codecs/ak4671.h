@@ -105,8 +105,6 @@
 #define AK4671_DIGITAL_MIXING_CONTROL2		0x59
 #define AK4671_SAR_ADC_CONTROL			0x5a
 
-#define AK4671_CACHEREGNUM			(AK4671_SAR_ADC_CONTROL + 1)
-
 /* Bitfield Definitions */
 
 /* AK4671_AD_DA_POWER_MANAGEMENT (0x00) Fields */
@@ -149,8 +147,5 @@
 
 /* AK4671_LOUT2_POWER_MANAGEMENT (0x10) Fields */
 #define AK4671_MUTEN				0x04
-
-extern struct snd_soc_dai ak4671_dai;
-extern struct snd_soc_codec_device soc_codec_dev_ak4671;
 
 #endif

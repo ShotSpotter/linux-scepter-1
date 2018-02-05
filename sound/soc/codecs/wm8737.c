@@ -1,12 +1,9 @@
 /*
- * wm8737.c  --  Wm8737 ALSA SoC Audio driver
+ * wm8737.c  --  WM8737 ALSA SoC Audio driver
  *
+ * Copyright 2010 Wolfson Microelectronics plc
  *
- * Copyright 2011 SST Inc.
- *
- * Author: Sarah Newman <snewman@shotspotter.com>
- *
- * Based on wm8731.c by Richard Purdie and wm8737.c by Mark Brown
+ * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,10 +16,13 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/i2c.h>
-#include <linux/slab.h>
-#include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/spi.h>
+#include <linux/slab.h>
+#if 0
+#include <linux/of_device.h>
+#endif
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -31,50 +31,53 @@
 #include <sound/initval.h>
 #include <sound/tlv.h>
 
-#include <sound/wm8737.h>
 #include "wm8737.h"
+#define IS_ENABLED(x) defined(CONFIG_##x)
+#define devm_regulator_bulk_get regulator_bulk_get 
 
-
-static struct snd_soc_codec *wm8737_codec[MAX_WM8737_CNT];
-
-struct snd_soc_codec_device soc_codec_dev_wm8737;
-
-#define WM8737_NUM_SUPPLIES 5
+#define WM8737_NUM_SUPPLIES 4
 static const char *wm8737_supply_names[WM8737_NUM_SUPPLIES] = {
 	"DCVDD",
 	"DBVDD",
 	"AVDD",
 	"MVDD",
-	"MICBIAS"
 };
 
 /* codec private data */
 struct wm8737_priv {
-	struct snd_soc_codec codec;
+	struct regmap *regmap;
 	struct regulator_bulk_data supplies[WM8737_NUM_SUPPLIES];
-	u16 reg_cache[WM8737_REGISTER_COUNT];
 	unsigned int mclk;
-	int id;
 };
 
-
-static const u16 wm8737_reg[WM8737_REGISTER_COUNT] = {
-	0x00C3,     /* R0  - Left PGA volume */
-	0x00C3,     /* R1  - Right PGA volume */
-	0x0007,     /* R2  - AUDIO path L */
-	0x0007,     /* R3  - AUDIO path R */
-	0x0000,     /* R4  - 3D Enhance */
-	0x0000,     /* R5  - ADC Control */
-	0x0000,     /* R6  - Power Management */
-	0x000A,     /* R7  - Audio Format */
-	0x0000,     /* R8  - Clocking */
-	0x000F,     /* R9  - MIC Preamp Control */
-	0x0003,     /* R10 - Misc Bias Control */
-	0x0000,     /* R11 - Noise Gate */
-	0x007C,     /* R12 - ALC1 */
-	0x0000,     /* R13 - ALC2 */
-	0x0032,     /* R14 - ALC3 */
+static const struct reg_default wm8737_reg_defaults[] = {
+	{  0, 0x00C3 },     /* R0  - Left PGA volume */
+	{  1, 0x00C3 },     /* R1  - Right PGA volume */
+	{  2, 0x0007 },     /* R2  - AUDIO path L */
+	{  3, 0x0007 },     /* R3  - AUDIO path R */
+	{  4, 0x0000 },     /* R4  - 3D Enhance */
+	{  5, 0x0000 },     /* R5  - ADC Control */
+	{  6, 0x0000 },     /* R6  - Power Management */
+	{  7, 0x000A },     /* R7  - Audio Format */
+	{  8, 0x0000 },     /* R8  - Clocking */
+	{  9, 0x000F },     /* R9  - MIC Preamp Control */
+	{ 10, 0x0003 },     /* R10 - Misc Bias Control */
+	{ 11, 0x0000 },     /* R11 - Noise Gate */
+	{ 12, 0x007C },     /* R12 - ALC1 */
+	{ 13, 0x0000 },     /* R13 - ALC2 */
+	{ 14, 0x0032 },     /* R14 - ALC3 */
+        { 28, 0x0000 },     /* R28 - RESERVED SEE DATASHEET */
 };
+
+static bool wm8737_volatile(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case WM8737_RESET:
+		return true;
+	default:
+		return false;
+	}
+}
 
 static int wm8737_reset(struct snd_soc_codec *codec)
 {
@@ -89,51 +92,41 @@ static const unsigned int micboost_tlv[] = {
 	3, 3, TLV_DB_SCALE_ITEM(3300, 0, 0),
 };
 static const DECLARE_TLV_DB_SCALE(pga_tlv, -9750, 50, 1);
-static const DECLARE_TLV_DB_SCALE(adc_tlv_3d, -600, 600, 0);
+static const DECLARE_TLV_DB_SCALE(adc_tlv, -600, 600, 0);
 static const DECLARE_TLV_DB_SCALE(ng_tlv, -7800, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_max_tlv, -1200, 600, 0);
 static const DECLARE_TLV_DB_SCALE(alc_target_tlv, -1800, 100, 0);
 
-static const char *mic_preamp_bias_enum_text[] = {
+static const char *micbias_enum_text[] = {
 	"25%",
 	"50%",
 	"75%",
 	"100%",
 };
 
-static const struct soc_enum mic_preamp_bias_enum =
-	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 0, 4, mic_preamp_bias_enum_text);
+static SOC_ENUM_SINGLE_DECL(micbias_enum,
+			    WM8737_MIC_PREAMP_CONTROL, 0, micbias_enum_text);
 
-static const char *zc_timeout_text[] = {
-		"256/fs", "512/fs","1024/fs","2048/fs",
-};
-
-static const struct soc_enum zc_timeout_enum_l =
-	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_L, 0, 4, zc_timeout_text);
-
-static const struct soc_enum zc_timeout_enum_r =
-	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_R, 0, 4, zc_timeout_text);
-
-static const char *low_3d_cutoff_text[] = {
+static const char *low_cutoff_text[] = {
 	"Low", "High"
 };
 
-static const struct soc_enum low_3d =
-	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 6, 2, low_3d_cutoff_text);
+static SOC_ENUM_SINGLE_DECL(low_3d,
+			    WM8737_3D_ENHANCE, 6, low_cutoff_text);
 
-static const char *high_3d_cutoff_text[] = {
+static const char *high_cutoff_text[] = {
 	"High", "Low"
 };
 
-static const struct soc_enum high_3d =
-	SOC_ENUM_SINGLE(WM8737_3D_ENHANCE, 5, 2, high_3d_cutoff_text);
+static SOC_ENUM_SINGLE_DECL(high_3d,
+			    WM8737_3D_ENHANCE, 5, high_cutoff_text);
 
 static const char *alc_fn_text[] = {
 	"Disabled", "Right", "Left", "Stereo"
 };
 
-static const struct soc_enum alc_fn =
-	SOC_ENUM_SINGLE(WM8737_ALC1, 7, 4, alc_fn_text);
+static SOC_ENUM_SINGLE_DECL(alc_fn,
+			    WM8737_ALC1, 7, alc_fn_text);
 
 static const char *alc_hold_text[] = {
 	"0", "2.67ms", "5.33ms", "10.66ms", "21.32ms", "42.64ms", "85.28ms",
@@ -141,54 +134,53 @@ static const char *alc_hold_text[] = {
 	"10.916s", "21.832s", "43.691s"
 };
 
-static const struct soc_enum alc_hold =
-	SOC_ENUM_SINGLE(WM8737_ALC2, 0, 16, alc_hold_text);
+static SOC_ENUM_SINGLE_DECL(alc_hold,
+			    WM8737_ALC2, 0, alc_hold_text);
 
 static const char *alc_atk_text[] = {
 	"8.4ms", "16.8ms", "33.6ms", "67.2ms", "134.4ms", "268.8ms", "537.6ms",
 	"1.075s", "2.15s", "4.3s", "8.6s"
 };
 
-static const struct soc_enum alc_atk =
-	SOC_ENUM_SINGLE(WM8737_ALC3, 0, 11, alc_atk_text);
+static SOC_ENUM_SINGLE_DECL(alc_atk,
+			    WM8737_ALC3, 0, alc_atk_text);
 
 static const char *alc_dcy_text[] = {
 	"33.6ms", "67.2ms", "134.4ms", "268.8ms", "537.6ms", "1.075s", "2.15s",
 	"4.3s", "8.6s", "17.2s", "34.41s"
 };
 
-static const struct soc_enum alc_dcy =
-	SOC_ENUM_SINGLE(WM8737_ALC3, 4, 11, alc_dcy_text);
+static SOC_ENUM_SINGLE_DECL(alc_dcy,
+			    WM8737_ALC3, 4, alc_dcy_text);
 
 static const struct snd_kcontrol_new wm8737_snd_controls[] = {
 SOC_DOUBLE_R_TLV("Mic Boost Volume", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
-		 5, 3, 0, micboost_tlv),
+		 6, 3, 0, micboost_tlv),
 SOC_DOUBLE_R("Mic Boost Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
 	     4, 1, 0),
-SOC_DOUBLE_R("Mic ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
+SOC_DOUBLE("Mic ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
 	   3, 1, 0),
 
 SOC_DOUBLE_R_TLV("Capture Volume", WM8737_LEFT_PGA_VOLUME,
 		 WM8737_RIGHT_PGA_VOLUME, 0, 255, 0, pga_tlv),
-SOC_DOUBLE_R("Capture ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
+SOC_DOUBLE("Capture ZC Switch", WM8737_AUDIO_PATH_L, WM8737_AUDIO_PATH_R,
 	   2, 1, 0),
-
-SOC_ENUM("Left ZC Timeout", zc_timeout_enum_l),
-SOC_ENUM("Right ZC Timeout", zc_timeout_enum_r),
 
 SOC_DOUBLE("INPUT1 DC Bias Switch", WM8737_MISC_BIAS_CONTROL, 0, 1, 1, 0),
 
-SOC_ENUM("Mic Preamp Bias", mic_preamp_bias_enum),
+SOC_ENUM("Mic PGA Bias", micbias_enum),
 SOC_SINGLE("ADC Low Power Switch", WM8737_ADC_CONTROL, 2, 1, 0),
 SOC_SINGLE("High Pass Filter Switch", WM8737_ADC_CONTROL, 0, 1, 1),
-SOC_SINGLE("Update DC Offset Switch", WM8737_ADC_CONTROL, 4, 1, 0),
+SOC_SINGLE("HPF Continuous Update", WM8737_ADC_CONTROL, 4, 1, 0),
+SOC_SINGLE("3D Bypass A", WM8737_ALC2, 5, 0x1E0, 0),
+SOC_SINGLE("3D Bypass B", WM8737_REG_1C, 0, 0x1FF, 0),
 SOC_DOUBLE("Polarity Invert Switch", WM8737_ADC_CONTROL, 5, 6, 1, 0),
 
 SOC_SINGLE("3D Switch", WM8737_3D_ENHANCE, 0, 1, 0),
 SOC_SINGLE("3D Depth", WM8737_3D_ENHANCE, 1, 15, 0),
 SOC_ENUM("3D Low Cut-off", low_3d),
-SOC_ENUM("3D High Cut-off", high_3d),
-SOC_SINGLE_TLV("3D ADC Volume", WM8737_3D_ENHANCE, 7, 1, 1, adc_tlv_3d),
+SOC_ENUM("3D High Cut-off", low_3d),
+SOC_SINGLE_TLV("3D ADC Volume", WM8737_3D_ENHANCE, 7, 1, 1, adc_tlv),
 
 SOC_SINGLE("Noise Gate Switch", WM8737_NOISE_GATE, 0, 1, 0),
 SOC_SINGLE_TLV("Noise Gate Threshold Volume", WM8737_NOISE_GATE, 2, 7, 0,
@@ -207,8 +199,8 @@ static const char *linsel_text[] = {
 	"LINPUT1", "LINPUT2", "LINPUT3", "LINPUT1 DC",
 };
 
-static const struct soc_enum linsel_enum =
-	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_L, 7, 4, linsel_text);
+static SOC_ENUM_SINGLE_DECL(linsel_enum,
+			    WM8737_AUDIO_PATH_L, 7, linsel_text);
 
 static const struct snd_kcontrol_new linsel_mux =
 	SOC_DAPM_ENUM("LINSEL", linsel_enum);
@@ -218,8 +210,8 @@ static const char *rinsel_text[] = {
 	"RINPUT1", "RINPUT2", "RINPUT3", "RINPUT1 DC",
 };
 
-static const struct soc_enum rinsel_enum =
-	SOC_ENUM_SINGLE(WM8737_AUDIO_PATH_R, 7, 4, rinsel_text);
+static SOC_ENUM_SINGLE_DECL(rinsel_enum,
+			    WM8737_AUDIO_PATH_R, 7, rinsel_text);
 
 static const struct snd_kcontrol_new rinsel_mux =
 	SOC_DAPM_ENUM("RINSEL", rinsel_enum);
@@ -228,18 +220,18 @@ static const char *bypass_text[] = {
 	"Direct", "Preamp"
 };
 
-static const struct soc_enum lbypass_enum =
-	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 2, 2, bypass_text);
+static SOC_ENUM_SINGLE_DECL(lbypass_enum,
+			    WM8737_MIC_PREAMP_CONTROL, 2, bypass_text);
 
 static const struct snd_kcontrol_new lbypass_mux =
 	SOC_DAPM_ENUM("Left Bypass", lbypass_enum);
 
 
-static const struct soc_enum rbypass_enum =
-	SOC_ENUM_SINGLE(WM8737_MIC_PREAMP_CONTROL, 3, 2, bypass_text);
+static SOC_ENUM_SINGLE_DECL(rbypass_enum,
+			    WM8737_MIC_PREAMP_CONTROL, 3, bypass_text);
 
 static const struct snd_kcontrol_new rbypass_mux =
-	SOC_DAPM_ENUM("Right Bypass", rbypass_enum);
+	SOC_DAPM_ENUM("Left Bypass", rbypass_enum);
 
 static const struct snd_soc_dapm_widget wm8737_dapm_widgets[] = {
 SND_SOC_DAPM_INPUT("LINPUT1"),
@@ -260,8 +252,8 @@ SND_SOC_DAPM_MUX("Right Preamp Mux", SND_SOC_NOPM, 0, 0, &rbypass_mux),
 SND_SOC_DAPM_PGA("PGAL", WM8737_POWER_MANAGEMENT, 5, 0, NULL, 0),
 SND_SOC_DAPM_PGA("PGAR", WM8737_POWER_MANAGEMENT, 4, 0, NULL, 0),
 
-SND_SOC_DAPM_ADC("ADCL", NULL, WM8737_POWER_MANAGEMENT, 3, 0),
-SND_SOC_DAPM_ADC("ADCR", NULL, WM8737_POWER_MANAGEMENT, 2, 0),
+SND_SOC_DAPM_DAC("ADCL", NULL, WM8737_POWER_MANAGEMENT, 3, 0),
+SND_SOC_DAPM_DAC("ADCR", NULL, WM8737_POWER_MANAGEMENT, 2, 0),
 
 SND_SOC_DAPM_AIF_OUT("AIF", "Capture", 0, WM8737_POWER_MANAGEMENT, 6, 0),
 };
@@ -293,16 +285,6 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{ "AIF", NULL, "ADCR" },
 };
 
-static int wm8737_add_widgets(struct snd_soc_codec *codec)
-{
-	snd_soc_dapm_new_controls(codec, wm8737_dapm_widgets,
-				  ARRAY_SIZE(wm8737_dapm_widgets));
-
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
-
-	return 0;
-}
-
 /* codec mclk clock divider coefficients */
 static const struct {
 	u32 mclk;
@@ -310,14 +292,16 @@ static const struct {
 	u8 usb;
 	u8 sr;
 } coeff_div[] = {
+	{ 12288000,  8000, 0,  0x4 },
+	{ 12288000, 12000, 0,  0x8 },
 	{ 12288000, 16000, 0,  0xa },
 	{ 12288000, 24000, 0, 0x1c },
 	{ 12288000, 32000, 0,  0xc },
 	{ 12288000, 48000, 0,    0 },
 	{ 12288000, 96000, 0,  0xe },
 
-/*Not tested or reviewed*/
-#if 0
+	{ 11289600,  8000, 0, 0x14 },
+	{ 11289600, 11025, 0, 0x18 },
 	{ 11289600, 22050, 0, 0x1a },
 	{ 11289600, 44100, 0, 0x10 },
 	{ 11289600, 88200, 0, 0x1e },
@@ -347,21 +331,22 @@ static const struct {
 	{ 12000000, 48000, 1,  0x0 },
 	{ 12000000, 88200, 1, 0x1f },
 	{ 12000000, 96000, 1,  0xe },
-#endif
 };
-
 
 static int wm8737_hw_params(struct snd_pcm_substream *substream,
 			    struct snd_pcm_hw_params *params,
 			    struct snd_soc_dai *dai)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->card->codec;
-	struct wm8737_priv *wm8737 = codec->private_data;
+	struct snd_soc_codec *codec = dai->codec;
+	struct wm8737_priv *wm8737 = snd_soc_codec_get_drvdata(codec);
 	int i;
 	u16 clocking = 0;
 	u16 af = 0;
+	
+	printk(KERN_ERR "params_rate(params): %d\n", params_rate(params));
+	printk(KERN_ERR "params_width(params): %d\n", params_width(params));
+	printk(KERN_ERR "coeff_div[i].rate: %d\n", coeff_div[i].rate);
+	printk(KERN_ERR "wm8737->mclk: %d\n", wm8737->mclk);
 
 	for (i = 0; i < ARRAY_SIZE(coeff_div); i++) {
 		if (coeff_div[i].rate != params_rate(params))
@@ -384,22 +369,25 @@ static int wm8737_hw_params(struct snd_pcm_substream *substream,
 
 	clocking |= coeff_div[i].usb | (coeff_div[i].sr << WM8737_SR_SHIFT);
 
-	switch (params_format(params)) {
-	case SNDRV_PCM_FORMAT_S16_LE:
+	switch (params_width(params)) {
+	case 16:
 		break;
-	case SNDRV_PCM_FORMAT_S20_3LE:
-		af |= 1 << WM8737_WL_SHIFT;
+	case 20:
+		af |= 0x4;
 		break;
-	case SNDRV_PCM_FORMAT_S24_LE:
-		af |= 2 << WM8737_WL_SHIFT;
+	case 24:
+		af |= 0x8;
 		break;
-	case SNDRV_PCM_FORMAT_S32_LE:
-		af |= 3 << WM8737_WL_SHIFT;
+	case 32:
+		af |= 0xC;
 		break;
 	default:
 		return -EINVAL;
 	}
-
+	printk(KERN_ERR "af: %#x\n", af);
+	printk(KERN_ERR "WM8737_WL_MASK: %#x\n", WM8737_WL_MASK);
+	printk(KERN_ERR "clocking: %#x\n", clocking);
+	printk(KERN_ERR "WM8737_SR_MASK: %#x\n", WM8737_SR_MASK);
 	snd_soc_update_bits(codec, WM8737_AUDIO_FORMAT, WM8737_WL_MASK, af);
 	snd_soc_update_bits(codec, WM8737_CLOCKING,
 			    WM8737_USB_MODE | WM8737_CLKDIV2 | WM8737_SR_MASK,
@@ -408,54 +396,23 @@ static int wm8737_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int wm8737_pcm_prepare(struct snd_pcm_substream *substream,
-			      struct snd_soc_dai *dai)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->card->codec;
-
-	/* set active */
-	snd_soc_update_bits(codec,WM8737_AUDIO_FORMAT,WM8737_SDODIS_MASK,0 << WM8737_SDODIS_SHIFT);
-
-	/* TODO not sure if this is necessary given DAPM*/
-	snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,WM8737_AI_MASK,1 << WM8737_AI_SHIFT);
-
-	return 0;
-}
-
-static void wm8737_shutdown(struct snd_pcm_substream *substream,
-			    struct snd_soc_dai *dai)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->card->codec;
-
-	/* deactivate */
-	if (!codec->active) {
-		udelay(50);
-		snd_soc_update_bits(codec,WM8737_AUDIO_FORMAT,WM8737_SDODIS_MASK,1 << WM8737_SDODIS_SHIFT);
-	/* TODO not sure if this is necessary given DAPM*/
-		snd_soc_update_bits(codec,WM8737_POWER_MANAGEMENT,WM8737_AI_MASK,0 << WM8737_AI_SHIFT);
-	}
-}
-
-
 static int wm8737_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-		int clk_id, unsigned int freq, int dir)
+				 int clk_id, unsigned int freq, int dir)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
-	struct wm8737_priv *wm8737 = codec->private_data;
+	struct wm8737_priv *wm8737 = snd_soc_codec_get_drvdata(codec);
+	int i;
 
-	switch (freq) {
-	case 11289600:
-	case 12000000:
-	case 12288000:
-	case 16934400:
-	case 18432000:
-		wm8737->mclk = freq;
-		return 0;
+	for (i = 0; i < ARRAY_SIZE(coeff_div); i++) {
+		if (freq == coeff_div[i].mclk ||
+		    freq == coeff_div[i].mclk * 2) {
+			wm8737->mclk = freq;
+			return 0;
+		}
 	}
+
+	dev_err(codec->dev, "MCLK rate %dHz not supported\n", freq);
+
 	return -EINVAL;
 }
 
@@ -465,14 +422,18 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
 	u16 af = 0;
+	printk(KERN_ERR "I am in wm8737_set_dai_fmt.\n");
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBM_CFM:
+		printk(KERN_ERR "I'm a codec master\n");
 		af |= WM8737_MS;
 		break;
 	case SND_SOC_DAIFMT_CBS_CFS:
+		printk(KERN_ERR "I'm a codec slave\n");
 		break;
 	default:
+		printk(KERN_ERR "I'm a broken codec\n");
 		return -EINVAL;
 	}
 
@@ -489,7 +450,7 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		af |= 0x3;
 		break;
 	case SND_SOC_DAIFMT_DSP_B:
-		af |= (1 << WM8737_LRP_SHIFT) | 0x3;
+		af |= 0x13;
 		break;
 	default:
 		return -EINVAL;
@@ -499,7 +460,7 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	case SND_SOC_DAIFMT_NB_NF:
 		break;
 	case SND_SOC_DAIFMT_NB_IF:
-		af |= (1 << WM8737_LRP_SHIFT);
+		af |= WM8737_LRP;
 		break;
 	default:
 		return -EINVAL;
@@ -514,21 +475,23 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 static int wm8737_set_bias_level(struct snd_soc_codec *codec,
 				 enum snd_soc_bias_level level)
 {
-	struct wm8737_priv *wm8737 = codec->private_data;
+	struct wm8737_priv *wm8737 = snd_soc_codec_get_drvdata(codec);
 	int ret;
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
+	  /* turn micbias voltage to highest value 11*/
+	  snd_soc_update_bits(codec, WM8737_POWER_MANAGEMENT, WM8737_MICBIAS_MASK, WM8737_MICBIAS_MASK);
 		break;
 
 	case SND_SOC_BIAS_PREPARE:
 		/* VMID at 2*75k */
 		snd_soc_update_bits(codec, WM8737_MISC_BIAS_CONTROL,
-				    WM8737_VMIDSEL_MASK, 0 << WM8737_VMIDSEL_SHIFT);
+				    WM8737_VMIDSEL_MASK, 0);
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm.bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(wm8737->supplies),
 						    wm8737->supplies);
 			if (ret != 0) {
@@ -538,9 +501,12 @@ static int wm8737_set_bias_level(struct snd_soc_codec *codec,
 				return ret;
 			}
 
+			regcache_sync(wm8737->regmap);
+
 			/* Fast VMID ramp at 2*2.5k */
 			snd_soc_update_bits(codec, WM8737_MISC_BIAS_CONTROL,
-					    WM8737_VMIDSEL_MASK, 2 << WM8737_VMIDSEL_SHIFT);
+					    WM8737_VMIDSEL_MASK,
+					    2 << WM8737_VMIDSEL_SHIFT);
 
 			/* Bring VMID up */
 			snd_soc_update_bits(codec, WM8737_POWER_MANAGEMENT,
@@ -554,7 +520,8 @@ static int wm8737_set_bias_level(struct snd_soc_codec *codec,
 
 		/* VMID at 2*300k */
 		snd_soc_update_bits(codec, WM8737_MISC_BIAS_CONTROL,
-				    WM8737_VMIDSEL_MASK, 1 << WM8737_VMIDSEL_SHIFT);
+				    WM8737_VMIDSEL_MASK,
+				    1 << WM8737_VMIDSEL_SHIFT);
 
 		break;
 
@@ -567,303 +534,140 @@ static int wm8737_set_bias_level(struct snd_soc_codec *codec,
 		break;
 	}
 
-	codec->bias_level = level;
+	codec->dapm.bias_level = level;
 	return 0;
 }
 
-#define WM8737_RATES (SNDRV_PCM_RATE_8000_96000| SNDRV_PCM_RATE_KNOT)
+#define WM8737_RATES SNDRV_PCM_RATE_8000_96000
 
 #define WM8737_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
-static struct snd_soc_dai_ops wm8737_dai_ops = {
-	.prepare	= wm8737_pcm_prepare,
+static const struct snd_soc_dai_ops wm8737_dai_ops = {
 	.hw_params	= wm8737_hw_params,
-	.shutdown	= wm8737_shutdown,
 	.set_sysclk	= wm8737_set_dai_sysclk,
 	.set_fmt	= wm8737_set_dai_fmt,
 };
 
-struct snd_soc_dai wm8737_dai[MAX_WM8737_CNT];
-
-EXPORT_SYMBOL_GPL(wm8737_dai);
-
-#ifdef CONFIG_PM
-static int wm8737_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec = socdev->card->codec;
-	wm8737_set_bias_level(codec, SND_SOC_BIAS_OFF);
-	return 0;
-}
-
-static int wm8737_resume(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec = socdev->card->codec;
-	wm8737_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-	return 0;
-}
-#else
-#define wm8737_suspend NULL
-#define wm8737_resume NULL
-#endif
-
-static int wm8737_probe(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-	struct snd_soc_codec *codec;
-	int ret = 0;
-	int id;
-
-	if(pdev->id > MAX_WM8737_ID) {
-		dev_err(&pdev->dev, "Invalid wm8737 ID of %d\n",pdev->id);
-		return -EINVAL;
-	}
-
-	if(pdev->id >= 0)
-		id = pdev->id;
-	else
-		id = 0;
-
-	if (wm8737_codec[id] == NULL) {
-		dev_err(&pdev->dev, "Codec device not registered at %i\n",id);
-		ret = -ENODEV;
-		goto pcm_err;
-	}
-
-	socdev->card->codec = wm8737_codec[id];
-	codec = wm8737_codec[id];
-
-	/* register pcms */
-	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
-	if (ret < 0) {
-		dev_err(codec->dev, "failed to create pcms: %d\n", ret);
-		ret = -EINVAL;
-		goto pcm_err;
-	}
-
-	snd_soc_add_controls(codec, wm8737_snd_controls,
-			     ARRAY_SIZE(wm8737_snd_controls));
-	wm8737_add_widgets(codec);
-
-	return ret;
-
-pcm_err:
-	return ret;
-}
-
-/* power down chip */
-static int wm8737_remove(struct platform_device *pdev)
-{
-	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
-
-	snd_soc_free_pcms(socdev);
-	snd_soc_dapm_free(socdev);
-
-	return 0;
-}
-
-struct snd_soc_codec_device soc_codec_dev_wm8737 = {
-	.probe = 	wm8737_probe,
-	.remove = 	wm8737_remove,
-	.suspend = 	wm8737_suspend,
-	.resume =	wm8737_resume,
+static struct snd_soc_dai_driver wm8737_dai = {
+	.name = "wm8737",
+	.capture = {
+		.stream_name = "Capture",
+		.channels_min = 2,  /* Mono modes not yet supported */
+		.channels_max = 2,
+		.rates = WM8737_RATES,
+		.formats = WM8737_FORMATS,
+	},
+	.ops = &wm8737_dai_ops,
 };
-EXPORT_SYMBOL_GPL(soc_codec_dev_wm8737);
 
-static int wm8737_register(struct wm8737_priv *wm8737,
-			   enum snd_soc_control_type control)
+static int wm8737_probe(struct snd_soc_codec *codec)
 {
-	int ret, i;
-	struct snd_soc_codec *codec = &wm8737->codec;
-	int id = wm8737->id;
-
-	if (wm8737_codec[id]) {
-		dev_err(codec->dev, "Another wm8737 is registered for %d\n",id);
-		ret = -EINVAL;
-		goto err;
-	}
-
-	mutex_init(&codec->mutex);
-	INIT_LIST_HEAD(&codec->dapm_widgets);
-	INIT_LIST_HEAD(&codec->dapm_paths);
-
-	codec->private_data = wm8737;
-	codec->name = "wm8737";
-	codec->owner = THIS_MODULE;
-	codec->bias_level = SND_SOC_BIAS_OFF;
-	codec->set_bias_level = wm8737_set_bias_level;
-	codec->dai = &wm8737_dai[id];
-	codec->num_dai = 1;
-	codec->reg_cache_size = WM8737_REGISTER_COUNT;
-	codec->reg_cache = &wm8737->reg_cache;
-
-	memcpy(codec->reg_cache, wm8737_reg, sizeof(wm8737_reg));
-
-	ret = snd_soc_codec_set_cache_io(codec, 7, 9, control);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
-		goto err;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(wm8737->supplies); i++)
-		wm8737->supplies[i].supply = wm8737_supply_names[i];
-
-	ret = regulator_bulk_get(codec->dev, ARRAY_SIZE(wm8737->supplies),
-				 wm8737->supplies);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to request supplies: %d\n", ret);
-		goto err;
-	}
+	struct wm8737_priv *wm8737 = snd_soc_codec_get_drvdata(codec);
+	int ret;
 
 	ret = regulator_bulk_enable(ARRAY_SIZE(wm8737->supplies),
 				    wm8737->supplies);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to enable supplies: %d\n", ret);
-		goto err_regulator_get;
+		goto err_get;
 	}
 
 	ret = wm8737_reset(codec);
-	snd_soc_update_bits(codec,WM8737_LEFT_PGA_VOLUME,WM8737_LVU_MASK,1 << WM8737_LVU_SHIFT);
-	snd_soc_update_bits(codec,WM8737_RIGHT_PGA_VOLUME,WM8737_RVU_MASK,1 << WM8737_RVU_SHIFT);
-
 	if (ret < 0) {
-		dev_err(codec->dev, "Failed to issue reset: %d\n", ret);
-		goto err_regulator_enable;
+		dev_err(codec->dev, "Failed to issue reset\n");
+		goto err_enable;
 	}
 
-	wm8737_dai[id].dev = codec->dev;
+	snd_soc_update_bits(codec, WM8737_LEFT_PGA_VOLUME, WM8737_LVU,
+			    WM8737_LVU);
+	snd_soc_update_bits(codec, WM8737_RIGHT_PGA_VOLUME, WM8737_RVU,
+			    WM8737_RVU);
 
 	wm8737_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
-	wm8737_codec[id] = codec;
-
-	ret = snd_soc_register_codec(codec);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to register codec: %d\n", ret);
-		goto err_regulator_enable;
-	}
-
-	ret = snd_soc_register_dai(&wm8737_dai[id]);
-	if (ret != 0) {
-		dev_err(codec->dev, "Failed to register DAI: %d\n", ret);
-		snd_soc_unregister_codec(codec);
-		goto err_codec;
-	}
-
+	/* Bias level configuration will have done an extra enable */
+	regulator_bulk_disable(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
 
 	return 0;
 
-err_codec:
-	snd_soc_unregister_codec(codec);
-err_regulator_enable:
+err_enable:
 	regulator_bulk_disable(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
-err_regulator_get:
-	regulator_bulk_free(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
-err:
-	kfree(wm8737);
+err_get:
 	return ret;
 }
 
-static void wm8737_unregister(struct wm8737_priv *wm8737)
-{
-	wm8737_set_bias_level(&wm8737->codec, SND_SOC_BIAS_OFF);
-	snd_soc_unregister_dai(&wm8737_dai[wm8737->id]);
-	snd_soc_unregister_codec(&wm8737->codec);
-	regulator_bulk_disable(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
-	regulator_bulk_free(ARRAY_SIZE(wm8737->supplies), wm8737->supplies);
-	kfree(wm8737);
+static struct snd_soc_codec_driver soc_codec_dev_wm8737 = {
+	.probe		= wm8737_probe,
+	.set_bias_level = wm8737_set_bias_level,
+	.suspend_bias_off = true,
 
-	wm8737_codec[wm8737->id] = NULL;
-}
-
-#if defined(CONFIG_SPI_MASTER)
-static int __devinit wm8737_spi_probe(struct spi_device *spi)
-{
-	struct snd_soc_codec *codec;
-	struct wm8737_priv *wm8737;
-	struct wm8737_platform_data *pdata = spi->dev.platform_data;
-
-	if(pdata && pdata->id > MAX_WM8737_ID) {
-		dev_err(&spi->dev, "Invalid wm8737 ID of %d\n",pdata->id);
-		return -EINVAL;
-	}
-
-	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
-	if (wm8737 == NULL)
-		return -ENOMEM;
-
-	if(pdata && pdata->id >= 0)
-		wm8737->id = pdata->id;
-	else
-		wm8737->id = 0;
-
-	codec = &wm8737->codec;
-	codec->control_data = spi;
-	codec->dev = &spi->dev;
-
-	dev_set_drvdata(&spi->dev, wm8737);
-
-	return wm8737_register(wm8737, SND_SOC_SPI);
-}
-
-static int __devexit wm8737_spi_remove(struct spi_device *spi)
-{
-	struct wm8737_priv *wm8737 = dev_get_drvdata(&spi->dev);
-
-	wm8737_unregister(wm8737);
-
-	return 0;
-}
-
-static struct spi_driver wm8737_spi_driver = {
-	.driver = {
-		.name	= "wm8737 spi",
-		.bus	= &spi_bus_type,
-		.owner	= THIS_MODULE,
-	},
-	.probe		= wm8737_spi_probe,
-	.remove		= __devexit_p(wm8737_spi_remove),
+	.controls = wm8737_snd_controls,
+	.num_controls = ARRAY_SIZE(wm8737_snd_controls),
+	.dapm_widgets = wm8737_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(wm8737_dapm_widgets),
+	.dapm_routes = intercon,
+	.num_dapm_routes = ARRAY_SIZE(intercon),
 };
-#endif /* CONFIG_SPI_MASTER */
 
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-static __devinit int wm8737_i2c_probe(struct i2c_client *i2c,
-				      const struct i2c_device_id *id)
+static const struct of_device_id wm8737_of_match[] = {
+	{ .compatible = "wlf,wm8737", },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, wm8737_of_match);
+
+static const struct regmap_config wm8737_regmap = {
+	.reg_bits = 7,
+	.val_bits = 9,
+	.max_register = WM8737_MAX_REGISTER,
+
+	.reg_defaults = wm8737_reg_defaults,
+	.num_reg_defaults = ARRAY_SIZE(wm8737_reg_defaults),
+	.cache_type = REGCACHE_RBTREE,
+
+	.volatile_reg = wm8737_volatile,
+};
+
+#if IS_ENABLED(CONFIG_I2C)
+static int wm8737_i2c_probe(struct i2c_client *i2c,
+			    const struct i2c_device_id *id)
 {
 	struct wm8737_priv *wm8737;
-	struct snd_soc_codec *codec;
-	struct wm8737_platform_data *pdata = i2c->dev.platform_data;
+	int ret, i;
 
-	if(pdata && pdata->id > MAX_WM8737_ID) {
-		dev_err(&i2c->dev, "Invalid wm8737 ID of %d\n",pdata->id);
-		return -EINVAL;
-	}
-
-	wm8737 = kzalloc(sizeof(struct wm8737_priv), GFP_KERNEL);
+	wm8737 = devm_kzalloc(&i2c->dev, sizeof(struct wm8737_priv),
+			      GFP_KERNEL);
 	if (wm8737 == NULL)
 		return -ENOMEM;
 
-	if(pdata && pdata->id >= 0)
-		wm8737->id = pdata->id;
-	else
-		wm8737->id = 0;
+	for (i = 0; i < ARRAY_SIZE(wm8737->supplies); i++)
+		wm8737->supplies[i].supply = wm8737_supply_names[i];
 
-	codec = &wm8737->codec;
+	ret = devm_regulator_bulk_get(&i2c->dev, ARRAY_SIZE(wm8737->supplies),
+				      wm8737->supplies);
+	if (ret != 0) {
+		dev_err(&i2c->dev, "Failed to request supplies: %d\n", ret);
+		return ret;
+	}
+
+	wm8737->regmap = devm_regmap_init_i2c(i2c, &wm8737_regmap);
+	if (IS_ERR(wm8737->regmap))
+		return PTR_ERR(wm8737->regmap);
 
 	i2c_set_clientdata(i2c, wm8737);
-	codec->control_data = i2c;
 
-	codec->dev = &i2c->dev;
+	ret =  snd_soc_register_codec(&i2c->dev,
+				      &soc_codec_dev_wm8737, &wm8737_dai, 1);
 
-	return wm8737_register(wm8737, SND_SOC_I2C);
+	return ret;
+
 }
 
-static __devexit int wm8737_i2c_remove(struct i2c_client *client)
+static int wm8737_i2c_remove(struct i2c_client *client)
 {
-	struct wm8737_priv *wm8737 = i2c_get_clientdata(client);
-	wm8737_unregister(wm8737);
+	snd_soc_unregister_codec(&client->dev);
+
 	return 0;
 }
 
@@ -875,43 +679,83 @@ MODULE_DEVICE_TABLE(i2c, wm8737_i2c_id);
 
 static struct i2c_driver wm8737_i2c_driver = {
 	.driver = {
-		.name = "wm8737 i2c",
+		.name = "wm8737",
 		.owner = THIS_MODULE,
+		.of_match_table = wm8737_of_match,
 	},
 	.probe =    wm8737_i2c_probe,
-	.remove =   __devexit_p(wm8737_i2c_remove),
+	.remove =   wm8737_i2c_remove,
 	.id_table = wm8737_i2c_id,
 };
 #endif
 
+#if defined(CONFIG_SPI_MASTER)
+static int wm8737_spi_probe(struct spi_device *spi)
+{
+	struct wm8737_priv *wm8737;
+	int ret, i;
+
+	wm8737 = devm_kzalloc(&spi->dev, sizeof(struct wm8737_priv),
+			      GFP_KERNEL);
+	if (wm8737 == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < ARRAY_SIZE(wm8737->supplies); i++)
+		wm8737->supplies[i].supply = wm8737_supply_names[i];
+
+	ret = devm_regulator_bulk_get(&spi->dev, ARRAY_SIZE(wm8737->supplies),
+				      wm8737->supplies);
+	if (ret != 0) {
+		dev_err(&spi->dev, "Failed to request supplies: %d\n", ret);
+		return ret;
+	}
+
+	wm8737->regmap = devm_regmap_init_spi(spi, &wm8737_regmap);
+	if (IS_ERR(wm8737->regmap))
+		return PTR_ERR(wm8737->regmap);
+
+	spi_set_drvdata(spi, wm8737);
+
+	ret = snd_soc_register_codec(&spi->dev,
+				     &soc_codec_dev_wm8737, &wm8737_dai, 1);
+
+	return ret;
+}
+
+static int wm8737_spi_remove(struct spi_device *spi)
+{
+	snd_soc_unregister_codec(&spi->dev);
+
+	return 0;
+}
+
+static struct spi_driver wm8737_spi_driver = {
+	.driver = {
+		.name	= "wm8737",
+		.owner	= THIS_MODULE,
+#if 0
+		.of_match_table = wm8737_of_match,
+#endif
+	},
+	.probe		= wm8737_spi_probe,
+	.remove		= wm8737_spi_remove,
+};
+#endif /* CONFIG_SPI_MASTER */
+
 static int __init wm8737_modinit(void)
 {
-	int ret,i;
-
-#ifdef CONFIG_SND_SOC_WM8737_MICBIAS
-	wm8737_micbias_regulator_voltage_init();
-#endif
-
-	for(i = 0; i < MAX_WM8737_CNT; i++) {
-		wm8737_dai[i].name = "wm8737";
-		wm8737_dai[i].capture.stream_name = "Capture";
-		wm8737_dai[i].capture.channels_min = 1;  /* Only gets us left channel and not mono as defined in the datasheet */
-		wm8737_dai[i].capture.channels_max = 2;
-		wm8737_dai[i].capture.rates = WM8737_RATES;
-		wm8737_dai[i].capture.formats = WM8737_FORMATS;
-		wm8737_dai[i].ops = &wm8737_dai_ops;
-	}
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
+	int ret;
+#if IS_ENABLED(CONFIG_I2C)
 	ret = i2c_add_driver(&wm8737_i2c_driver);
 	if (ret != 0) {
-		printk(KERN_ERR "Failed to register wm8737 I2C driver: %d\n",
+		printk(KERN_ERR "Failed to register WM8737 I2C driver: %d\n",
 		       ret);
 	}
 #endif
 #if defined(CONFIG_SPI_MASTER)
 	ret = spi_register_driver(&wm8737_spi_driver);
 	if (ret != 0) {
-		printk(KERN_ERR "Failed to register wm8737 SPI driver: %d\n",
+		printk(KERN_ERR "Failed to register WM8737 SPI driver: %d\n",
 		       ret);
 	}
 #endif
@@ -921,19 +765,15 @@ module_init(wm8737_modinit);
 
 static void __exit wm8737_exit(void)
 {
-#ifdef CONFIG_SND_SOC_WM8737_MICBIAS
-	wm8737_micbias_regulator_voltage_exit();
-#endif
-
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-	i2c_del_driver(&wm8737_i2c_driver);
-#endif
 #if defined(CONFIG_SPI_MASTER)
 	spi_unregister_driver(&wm8737_spi_driver);
+#endif
+#if IS_ENABLED(CONFIG_I2C)
+	i2c_del_driver(&wm8737_i2c_driver);
 #endif
 }
 module_exit(wm8737_exit);
 
-MODULE_DESCRIPTION("ASoC wm8737 driver");
-MODULE_AUTHOR("Sarah Newman");
+MODULE_DESCRIPTION("ASoC WM8737 driver");
+MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
 MODULE_LICENSE("GPL");

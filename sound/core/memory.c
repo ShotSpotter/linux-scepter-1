@@ -19,9 +19,11 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  *
  */
-
-#include <asm/io.h>
-#include <asm/uaccess.h>
+#if 0
+#include <linux/export.h>
+#endif
+#include <linux/io.h>
+#include <linux/uaccess.h>
 #include <sound/core.h>
 
 /**
@@ -32,7 +34,7 @@
  *
  * Copies the data from mmio-space to user-space.
  *
- * Returns zero if successful, or non-zero on failure.
+ * Return: Zero if successful, or non-zero on failure.
  */
 int copy_to_user_fromio(void __user *dst, const volatile void __iomem *src, size_t count)
 {
@@ -65,7 +67,7 @@ EXPORT_SYMBOL(copy_to_user_fromio);
  *
  * Copies the data from user-space to mmio-space.
  *
- * Returns zero if successful, or non-zero on failure.
+ * Return: Zero if successful, or non-zero on failure.
  */
 int copy_from_user_toio(volatile void __iomem *dst, const void __user *src, size_t count)
 {

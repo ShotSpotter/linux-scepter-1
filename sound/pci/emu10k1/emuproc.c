@@ -241,31 +241,22 @@ static void snd_emu10k1_proc_spdif_read(struct snd_info_entry *entry,
 	struct snd_emu10k1 *emu = entry->private_data;
 	u32 value;
 	u32 value2;
-	unsigned long flags;
 	u32 rate;
 
 	if (emu->card_capabilities->emu_model) {
-		spin_lock_irqsave(&emu->emu_lock, flags);
 		snd_emu1010_fpga_read(emu, 0x38, &value);
-		spin_unlock_irqrestore(&emu->emu_lock, flags);
 		if ((value & 0x1) == 0) {
-			spin_lock_irqsave(&emu->emu_lock, flags);
 			snd_emu1010_fpga_read(emu, 0x2a, &value);
 			snd_emu1010_fpga_read(emu, 0x2b, &value2);
-			spin_unlock_irqrestore(&emu->emu_lock, flags);
 			rate = 0x1770000 / (((value << 5) | value2)+1);	
 			snd_iprintf(buffer, "ADAT Locked : %u\n", rate);
 		} else {
 			snd_iprintf(buffer, "ADAT Unlocked\n");
 		}
-		spin_lock_irqsave(&emu->emu_lock, flags);
 		snd_emu1010_fpga_read(emu, 0x20, &value);
-		spin_unlock_irqrestore(&emu->emu_lock, flags);
 		if ((value & 0x4) == 0) {
-			spin_lock_irqsave(&emu->emu_lock, flags);
 			snd_emu1010_fpga_read(emu, 0x28, &value);
 			snd_emu1010_fpga_read(emu, 0x29, &value2);
-			spin_unlock_irqrestore(&emu->emu_lock, flags);
 			rate = 0x1770000 / (((value << 5) | value2)+1);	
 			snd_iprintf(buffer, "SPDIF Locked : %d\n", rate);
 		} else {
@@ -341,15 +332,17 @@ static void snd_emu10k1_proc_acode_read(struct snd_info_entry *entry,
 #define TOTAL_SIZE_CODE		(0x200*8)
 #define A_TOTAL_SIZE_CODE	(0x400*8)
 
-static long snd_emu10k1_fx8010_read(struct snd_info_entry *entry,
-				    void *file_private_data,
-				    struct file *file, char __user *buf,
-				    unsigned long count, unsigned long pos)
+static ssize_t snd_emu10k1_fx8010_read(struct snd_info_entry *entry,
+				       void *file_private_data,
+				       struct file *file, char __user *buf,
+				       size_t count, loff_t pos)
 {
-	long size;
 	struct snd_emu10k1 *emu = entry->private_data;
 	unsigned int offset;
 	int tram_addr = 0;
+	unsigned int *tmp;
+	long res;
+	unsigned int idx;
 	
 	if (!strcmp(entry->name, "fx8010_tram_addr")) {
 		offset = TANKMEMADDRREGBASE;
@@ -361,30 +354,25 @@ static long snd_emu10k1_fx8010_read(struct snd_info_entry *entry,
 	} else {
 		offset = emu->audigy ? A_FXGPREGBASE : FXGPREGBASE;
 	}
-	size = count;
-	if (pos + size > entry->size)
-		size = (long)entry->size - pos;
-	if (size > 0) {
-		unsigned int *tmp;
-		long res;
-		unsigned int idx;
-		if ((tmp = kmalloc(size + 8, GFP_KERNEL)) == NULL)
-			return -ENOMEM;
-		for (idx = 0; idx < ((pos & 3) + size + 3) >> 2; idx++)
-			if (tram_addr && emu->audigy) {
-				tmp[idx] = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0) >> 11;
-				tmp[idx] |= snd_emu10k1_ptr_read(emu, 0x100 + idx + (pos >> 2), 0) << 20;
-			} else 
-				tmp[idx] = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0);
-		if (copy_to_user(buf, ((char *)tmp) + (pos & 3), size))
-			res = -EFAULT;
-		else {
-			res = size;
+
+	tmp = kmalloc(count + 8, GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+	for (idx = 0; idx < ((pos & 3) + count + 3) >> 2; idx++) {
+		unsigned int val;
+		val = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0);
+		if (tram_addr && emu->audigy) {
+			val >>= 11;
+			val |= snd_emu10k1_ptr_read(emu, 0x100 + idx + (pos >> 2), 0) << 20;
 		}
-		kfree(tmp);
-		return res;
+		tmp[idx] = val;
 	}
-	return 0;
+	if (copy_to_user(buf, ((char *)tmp) + (pos & 3), count))
+		res = -EFAULT;
+	else
+		res = count;
+	kfree(tmp);
+	return res;
 }
 
 static void snd_emu10k1_proc_voices_read(struct snd_info_entry *entry, 
@@ -413,14 +401,11 @@ static void snd_emu_proc_emu1010_reg_read(struct snd_info_entry *entry,
 {
 	struct snd_emu10k1 *emu = entry->private_data;
 	u32 value;
-	unsigned long flags;
 	int i;
 	snd_iprintf(buffer, "EMU1010 Registers:\n\n");
 
 	for(i = 0; i < 0x40; i+=1) {
-		spin_lock_irqsave(&emu->emu_lock, flags);
 		snd_emu1010_fpga_read(emu, i, &value);
-		spin_unlock_irqrestore(&emu->emu_lock, flags);
 		snd_iprintf(buffer, "%02X: %08X, %02X\n", i, value, (value >> 8) & 0x7f);
 	}
 }
@@ -580,7 +565,7 @@ static struct snd_info_entry_ops snd_emu10k1_proc_ops_fx8010 = {
 	.read = snd_emu10k1_fx8010_read,
 };
 
-int __devinit snd_emu10k1_proc_init(struct snd_emu10k1 * emu)
+int snd_emu10k1_proc_init(struct snd_emu10k1 *emu)
 {
 	struct snd_info_entry *entry;
 #ifdef CONFIG_SND_DEBUG

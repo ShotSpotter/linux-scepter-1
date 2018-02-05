@@ -11,6 +11,8 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
+#include <linux/of_address.h>
+#include <linux/of_irq.h>
 
 #include <sound/core.h>
 
@@ -29,7 +31,7 @@ module_param(force, int, 0444);
 MODULE_PARM_DESC(force, "Force loading i2sbus even when"
 			" no layout-id property is present");
 
-static struct of_device_id i2sbus_match[] = {
+static const struct of_device_id i2sbus_match[] = {
 	{ .name = "i2s" },
 	{ }
 };
@@ -45,15 +47,11 @@ static int alloc_dbdma_descriptor_ring(struct i2sbus_dev *i2sdev,
 	/* We use the PCI APIs for now until the generic one gets fixed
 	 * enough or until we get some macio-specific versions
 	 */
-	r->space = dma_alloc_coherent(
-			&macio_get_pci_dev(i2sdev->macio)->dev,
-			r->size,
-			&r->bus_addr,
-			GFP_KERNEL);
+	r->space = dma_zalloc_coherent(&macio_get_pci_dev(i2sdev->macio)->dev,
+				       r->size, &r->bus_addr, GFP_KERNEL);
+	if (!r->space)
+		return -ENOMEM;
 
-	if (!r->space) return -ENOMEM;
-
-	memset(r->space, 0, r->size);
 	r->cmds = (void*)DBDMA_ALIGN(r->space);
 	r->bus_cmd_start = r->bus_addr +
 			   (dma_addr_t)((char*)r->cmds - (char*)r->space);
@@ -76,13 +74,11 @@ static void i2sbus_release_dev(struct device *dev)
 	int i;
 
 	i2sdev = container_of(dev, struct i2sbus_dev, sound.ofdev.dev);
-
- 	if (i2sdev->intfregs) iounmap(i2sdev->intfregs);
- 	if (i2sdev->out.dbdma) iounmap(i2sdev->out.dbdma);
- 	if (i2sdev->in.dbdma) iounmap(i2sdev->in.dbdma);
+	iounmap(i2sdev->intfregs);
+	iounmap(i2sdev->out.dbdma);
+	iounmap(i2sdev->in.dbdma);
 	for (i = aoa_resource_i2smmio; i <= aoa_resource_rxdbdma; i++)
-		if (i2sdev->allocated_resource[i])
-			release_and_free_resource(i2sdev->allocated_resource[i]);
+		release_and_free_resource(i2sdev->allocated_resource[i]);
 	free_dbdma_descriptor_ring(i2sdev, &i2sdev->out.dbdma_ring);
 	free_dbdma_descriptor_ring(i2sdev, &i2sdev->in.dbdma_ring);
 	for (i = aoa_resource_i2smmio; i <= aoa_resource_rxdbdma; i++)
@@ -200,7 +196,8 @@ static int i2sbus_add_dev(struct macio_dev *macio,
 			 * We probably cannot handle all device-id machines,
 			 * so restrict to those we do handle for now.
 			 */
-			if (id && (*id == 22 || *id == 14 || *id == 35)) {
+			if (id && (*id == 22 || *id == 14 || *id == 35 ||
+				   *id == 44)) {
 				snprintf(dev->sound.modalias, 32,
 					 "aoa-device-id-%d", *id);
 				ok = 1;
@@ -221,9 +218,9 @@ static int i2sbus_add_dev(struct macio_dev *macio,
 
 	mutex_init(&dev->lock);
 	spin_lock_init(&dev->low_lock);
-	dev->sound.ofdev.node = np;
-	dev->sound.ofdev.dma_mask = macio->ofdev.dma_mask;
-	dev->sound.ofdev.dev.dma_mask = &dev->sound.ofdev.dma_mask;
+	dev->sound.ofdev.archdata.dma_mask = macio->ofdev.archdata.dma_mask;
+	dev->sound.ofdev.dev.of_node = np;
+	dev->sound.ofdev.dev.dma_mask = &dev->sound.ofdev.archdata.dma_mask;
 	dev->sound.ofdev.dev.parent = &macio->ofdev.dev;
 	dev->sound.ofdev.dev.release = i2sbus_release_dev;
 	dev->sound.attach_codec = i2sbus_attach_codec;
@@ -262,8 +259,7 @@ static int i2sbus_add_dev(struct macio_dev *macio,
 		 */
 		dev->allocated_resource[i] =
 			request_mem_region(dev->resources[i].start,
-					   dev->resources[i].end -
-					   dev->resources[i].start + 1,
+					   resource_size(&dev->resources[i]),
 					   dev->rnames[i]);
 		if (!dev->allocated_resource[i]) {
 			printk(KERN_ERR "i2sbus: failed to claim resource %d!\n", i);
@@ -272,19 +268,19 @@ static int i2sbus_add_dev(struct macio_dev *macio,
 	}
 
 	r = &dev->resources[aoa_resource_i2smmio];
-	rlen = r->end - r->start + 1;
+	rlen = resource_size(r);
 	if (rlen < sizeof(struct i2s_interface_regs))
 		goto err;
 	dev->intfregs = ioremap(r->start, rlen);
 
 	r = &dev->resources[aoa_resource_txdbdma];
-	rlen = r->end - r->start + 1;
+	rlen = resource_size(r);
 	if (rlen < sizeof(struct dbdma_regs))
 		goto err;
 	dev->out.dbdma = ioremap(r->start, rlen);
 
 	r = &dev->resources[aoa_resource_rxdbdma];
-	rlen = r->end - r->start + 1;
+	rlen = resource_size(r);
 	if (rlen < sizeof(struct dbdma_regs))
 		goto err;
 	dev->in.dbdma = ioremap(r->start, rlen);
@@ -321,12 +317,11 @@ static int i2sbus_add_dev(struct macio_dev *macio,
 			free_irq(dev->interrupts[i], dev);
 	free_dbdma_descriptor_ring(dev, &dev->out.dbdma_ring);
 	free_dbdma_descriptor_ring(dev, &dev->in.dbdma_ring);
-	if (dev->intfregs) iounmap(dev->intfregs);
-	if (dev->out.dbdma) iounmap(dev->out.dbdma);
-	if (dev->in.dbdma) iounmap(dev->in.dbdma);
+	iounmap(dev->intfregs);
+	iounmap(dev->out.dbdma);
+	iounmap(dev->in.dbdma);
 	for (i=0;i<3;i++)
-		if (dev->allocated_resource[i])
-			release_and_free_resource(dev->allocated_resource[i]);
+		release_and_free_resource(dev->allocated_resource[i]);
 	mutex_destroy(&dev->lock);
 	kfree(dev);
 	return 0;
@@ -346,7 +341,7 @@ static int i2sbus_probe(struct macio_dev* dev, const struct of_device_id *match)
 		return -ENODEV;
 	}
 
-	while ((np = of_get_next_child(dev->ofdev.node, np))) {
+	while ((np = of_get_next_child(dev->ofdev.dev.of_node, np))) {
 		if (of_device_is_compatible(np, "i2sbus") ||
 		    of_device_is_compatible(np, "i2s-modem")) {
 			got += i2sbus_add_dev(dev, control, np);
@@ -385,10 +380,8 @@ static int i2sbus_suspend(struct macio_dev* dev, pm_message_t state)
 
 	list_for_each_entry(i2sdev, &control->list, item) {
 		/* Notify Alsa */
-		if (i2sdev->sound.pcm) {
-			/* Suspend PCM streams */
-			snd_pcm_suspend_all(i2sdev->sound.pcm);
-		}
+		/* Suspend PCM streams */
+		snd_pcm_suspend_all(i2sdev->sound.pcm);
 
 		/* Notify codecs */
 		list_for_each_entry(cii, &i2sdev->sound.codec_list, list) {
@@ -437,9 +430,11 @@ static int i2sbus_shutdown(struct macio_dev* dev)
 }
 
 static struct macio_driver i2sbus_drv = {
-	.name = "soundbus-i2s",
-	.owner = THIS_MODULE,
-	.match_table = i2sbus_match,
+	.driver = {
+		.name = "soundbus-i2s",
+		.owner = THIS_MODULE,
+		.of_match_table = i2sbus_match,
+	},
 	.probe = i2sbus_probe,
 	.remove = i2sbus_remove,
 #ifdef CONFIG_PM

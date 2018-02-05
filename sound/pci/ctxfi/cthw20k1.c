@@ -1268,7 +1268,8 @@ static int hw_trn_init(struct hw *hw, const struct trn_conf *info)
 
 	/* Set up device page table */
 	if ((~0UL) == info->vm_pgt_phys) {
-		printk(KERN_ERR "Wrong device page table page address!\n");
+		dev_err(hw->card->dev,
+			"Wrong device page table page address!\n");
 		return -1;
 	}
 
@@ -1285,7 +1286,7 @@ static int hw_trn_init(struct hw *hw, const struct trn_conf *info)
 	hw_write_20kx(hw, PTPALX, ptp_phys_low);
 	hw_write_20kx(hw, PTPAHX, ptp_phys_high);
 	hw_write_20kx(hw, TRNCTL, trnctl);
-	hw_write_20kx(hw, TRNIS, 0x200c01); /* realy needed? */
+	hw_write_20kx(hw, TRNIS, 0x200c01); /* really needed? */
 
 	return 0;
 }
@@ -1327,7 +1328,7 @@ static int hw_pll_init(struct hw *hw, unsigned int rsr)
 		mdelay(40);
 	}
 	if (i >= 3) {
-		printk(KERN_ALERT "PLL initialization failed!!!\n");
+		dev_alert(hw->card->dev, "PLL initialization failed!!!\n");
 		return -EBUSY;
 	}
 
@@ -1351,7 +1352,7 @@ static int hw_auto_init(struct hw *hw)
 			break;
 	}
 	if (!get_field(gctl, GCTL_AID)) {
-		printk(KERN_ALERT "Card Auto-init failed!!!\n");
+		dev_alert(hw->card->dev, "Card Auto-init failed!!!\n");
 		return -EBUSY;
 	}
 
@@ -1777,10 +1778,17 @@ static int hw_adc_init(struct hw *hw, const struct adc_conf *info)
 		return adc_init_SBx(hw, info->input, info->mic20db);
 }
 
-static int hw_have_digit_io_switch(struct hw *hw)
+static struct capabilities hw_capabilities(struct hw *hw)
 {
+	struct capabilities cap;
+
 	/* SB073x and Vista compatible cards have no digit IO switch */
-	return !(hw->model == CTSB073X || hw->model == CTUAA);
+	cap.digit_io_switch = !(hw->model == CTSB073X || hw->model == CTUAA);
+	cap.dedicated_mic = 0;
+	cap.output_switch = 0;
+	cap.mic_source_switch = 0;
+
+	return cap;
 }
 
 #define CTLBITS(a, b, c, d)	(((a) << 24) | ((b) << 16) | ((c) << 8) | (d))
@@ -1795,7 +1803,7 @@ static int uaa_to_xfi(struct pci_dev *pci)
 	unsigned int is_uaa;
 	unsigned int data[4] = {0};
 	unsigned int io_base;
-	void *mem_base;
+	void __iomem *mem_base;
 	int i;
 	const u32 CTLX = CTLBITS('C', 'T', 'L', 'X');
 	const u32 CTL_ = CTLBITS('C', 'T', 'L', '-');
@@ -1904,9 +1912,9 @@ static int hw_card_start(struct hw *hw)
 	/* Set DMA transfer mask */
 	if (pci_set_dma_mask(pci, CT_XFI_DMA_MASK) < 0 ||
 	    pci_set_consistent_dma_mask(pci, CT_XFI_DMA_MASK) < 0) {
-		printk(KERN_ERR "architecture does not support PCI "
-				"busmaster DMA with mask 0x%llx\n",
-		       CT_XFI_DMA_MASK);
+		dev_err(hw->card->dev,
+			"architecture does not support PCI busmaster DMA with mask 0x%llx\n",
+			CT_XFI_DMA_MASK);
 		err = -ENXIO;
 		goto error1;
 	}
@@ -1933,9 +1941,10 @@ static int hw_card_start(struct hw *hw)
 
 	if (hw->irq < 0) {
 		err = request_irq(pci->irq, ct_20k1_interrupt, IRQF_SHARED,
-				  "ctxfi", hw);
+				  KBUILD_MODNAME, hw);
 		if (err < 0) {
-			printk(KERN_ERR "XFi: Cannot get irq %d\n", pci->irq);
+			dev_err(hw->card->dev,
+				"XFi: Cannot get irq %d\n", pci->irq);
 			goto error2;
 		}
 		hw->irq = pci->irq;
@@ -1976,11 +1985,8 @@ static int hw_card_shutdown(struct hw *hw)
 		free_irq(hw->irq, hw);
 
 	hw->irq	= -1;
-
-	if (hw->mem_base)
-		iounmap((void *)hw->mem_base);
-
-	hw->mem_base = (unsigned long)NULL;
+	iounmap(hw->mem_base);
+	hw->mem_base = NULL;
 
 	if (hw->io_base)
 		pci_release_regions(hw->pci);
@@ -2078,8 +2084,8 @@ static int hw_card_init(struct hw *hw, struct card_conf *info)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int hw_suspend(struct hw *hw, pm_message_t state)
+#ifdef CONFIG_PM_SLEEP
+static int hw_suspend(struct hw *hw)
 {
 	struct pci_dev *pci = hw->pci;
 
@@ -2090,20 +2096,11 @@ static int hw_suspend(struct hw *hw, pm_message_t state)
 		pci_write_config_dword(pci, UAA_CFG_SPACE_FLAG, 0x0);
 	}
 
-	pci_disable_device(pci);
-	pci_save_state(pci);
-	pci_set_power_state(pci, pci_choose_state(pci, state));
-
 	return 0;
 }
 
 static int hw_resume(struct hw *hw, struct card_conf *info)
 {
-	struct pci_dev *pci = hw->pci;
-
-	pci_set_power_state(pci, PCI_D0);
-	pci_restore_state(pci);
-
 	/* Re-initialize card hardware. */
 	return hw_card_init(hw, info);
 }
@@ -2164,7 +2161,7 @@ static void hw_write_pci(struct hw *hw, u32 reg, u32 data)
 		&container_of(hw, struct hw20k1, hw)->reg_pci_lock, flags);
 }
 
-static struct hw ct20k1_preset __devinitdata = {
+static struct hw ct20k1_preset = {
 	.irq = -1,
 
 	.card_init = hw_card_init,
@@ -2172,8 +2169,8 @@ static struct hw ct20k1_preset __devinitdata = {
 	.pll_init = hw_pll_init,
 	.is_adc_source_selected = hw_is_adc_input_selected,
 	.select_adc_source = hw_adc_input_select,
-	.have_digit_io_switch = hw_have_digit_io_switch,
-#ifdef CONFIG_PM
+	.capabilities = hw_capabilities,
+#ifdef CONFIG_PM_SLEEP
 	.suspend = hw_suspend,
 	.resume = hw_resume,
 #endif
@@ -2268,7 +2265,7 @@ static struct hw ct20k1_preset __devinitdata = {
 	.get_wc = get_wc,
 };
 
-int __devinit create_20k1_hw_obj(struct hw **rhw)
+int create_20k1_hw_obj(struct hw **rhw)
 {
 	struct hw20k1 *hw20k1;
 

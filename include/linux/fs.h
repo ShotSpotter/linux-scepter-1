@@ -1795,6 +1795,18 @@ void put_super(struct super_block *sb);
 	(((fops) && try_module_get((fops)->owner) ? (fops) : NULL))
 #define fops_put(fops) \
 	do { if (fops) module_put((fops)->owner); } while(0)
+/*
+ * This one is to be used *ONLY* from ->open() instances.
+ * fops must be non-NULL, pinned down *and* module dependencies
+ * should be sufficient to pin the caller down as well.
+ */
+#define replace_fops(f, fops) \
+        do {    \
+                struct file *__file = (f); \
+                fops_put(__file->f_op); \
+                BUG_ON(!(__file->f_op = (fops))); \
+        } while(0)
+
 
 extern int register_filesystem(struct file_system_type *);
 extern int unregister_filesystem(struct file_system_type *);
@@ -2343,6 +2355,7 @@ extern loff_t dcache_dir_lseek(struct file *, loff_t, int);
 extern int dcache_readdir(struct file *, void *, filldir_t);
 extern int simple_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int simple_statfs(struct dentry *, struct kstatfs *);
+extern int simple_open(struct inode *inode, struct file *file);
 extern int simple_link(struct dentry *, struct inode *, struct dentry *);
 extern int simple_unlink(struct inode *, struct dentry *);
 extern int simple_rmdir(struct inode *, struct dentry *);

@@ -12,6 +12,12 @@
 #ifndef _TLV320AIC23_H
 #define _TLV320AIC23_H
 
+struct device;
+struct regmap_config;
+
+extern const struct regmap_config tlv320aic23_regmap;
+int tlv320aic23_probe(struct device *dev, struct regmap *regmap);
+
 /* Codec TLV320AIC23 */
 #define TLV320AIC23_LINVOL		0x00
 #define TLV320AIC23_RINVOL		0x01
@@ -115,8 +121,5 @@
 #define TLV320AIC23_SIDETONE_9		0x040
 #define TLV320AIC23_SIDETONE_12		0x080
 #define TLV320AIC23_SIDETONE_18		0x0c0
-
-extern struct snd_soc_dai tlv320aic23_dai;
-extern struct snd_soc_codec_device soc_codec_dev_tlv320aic23;
 
 #endif /* _TLV320AIC23_H */

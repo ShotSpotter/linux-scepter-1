@@ -42,10 +42,11 @@
 #include <plat/nand.h>
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
-
+#if 0
 #include <sound/wm8737.h>
 #include <plat/wm8737-sync.h>
 #include <sound/soc-dai.h>
+#endif
 #include <linux/regulator/machine.h>
 #include <linux/regulator/wm8737-micbias-regulator.h>
 #include <linux/regulator/fixed.h>
@@ -456,6 +457,7 @@ static struct platform_device scepter_wm8737_micbias_device[] = {
 		},
 };
 
+#if 0
 static struct wm8737_platform_data scepter_wm8737_data[] = {
 		{
 				.id = 0,
@@ -464,7 +466,6 @@ static struct wm8737_platform_data scepter_wm8737_data[] = {
 				.id = 1,
 		}
 };
-
 static struct wm8737_omap_data scepter_wm8737_master =
 {
 		.wm8737_id = 0,
@@ -499,7 +500,7 @@ static struct platform_device scepter_wm8737_sync = {
 			.platform_data = &scepter_wm8737_sync_data,
 		},
 };
-
+#endif
 static struct platform_device generic_soc_slave = {
 		.name = "asoc-slave-codec",
 		.id = -1,
@@ -536,11 +537,15 @@ static struct i2c_board_info __initdata scepter_i2c1_boardinfo[] = {
 static struct i2c_board_info __initdata scepter_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("wm8737",0x1A),
+#if 0
 		.platform_data = &(scepter_wm8737_data[0]),
+#endif
 	},
 	{
 		I2C_BOARD_INFO("wm8737",0x1B),
+#if 0
 		.platform_data = &(scepter_wm8737_data[1]),
+#endif
 	}
 };
 
@@ -569,7 +574,9 @@ static struct omap_board_config_kernel scepter_config[] __initdata = {
 
 static struct platform_device *scepter_devices[] __initdata = {
 	&leds_gpio,
+#if 0
 	&scepter_wm8737_sync,
+#endif
 	&generic_soc_slave,
 	&scepter_wm8737_dvdd_device,
 	&scepter_wm8737_avdd_mvdd_device,

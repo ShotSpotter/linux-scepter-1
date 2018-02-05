@@ -9,8 +9,6 @@
 #ifndef _BF5XX_AC97_H
 #define _BF5XX_AC97_H
 
-extern struct snd_ac97_bus_ops bf5xx_ac97_ops;
-extern struct snd_ac97 *ac97;
 /* Frame format in memory, only support stereo currently */
 struct ac97_frame {
 	u16 ac97_tag;		/* slot 0 */
@@ -49,8 +47,6 @@ struct ac97_frame {
 #define TAG_PCM_SL		0x0100
 #define TAG_PCM_SR		0x0080
 #define TAG_PCM_LFE		0x0040
-
-extern struct snd_soc_dai bfin_ac97_dai;
 
 void bf5xx_pcm_to_ac97(struct ac97_frame *dst, const __u16 *src, \
 		size_t count, unsigned int chan_mask);

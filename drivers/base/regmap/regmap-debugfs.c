@@ -19,7 +19,7 @@
 
 #include "internal.h"
 
-#define IS_ENABLED(x) define(CONFIG_##x)
+#define IS_ENABLED(x) defined(x)
 
 struct regmap_debugfs_node {
 	struct regmap *map;

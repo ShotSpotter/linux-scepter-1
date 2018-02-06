@@ -476,7 +476,7 @@ static int snd_pcm_hw_refine_user(struct snd_pcm_substream *substream,
 	kfree(params);
 	return err;
 }
-
+#if 0
 static int period_to_usecs(struct snd_pcm_runtime *runtime)
 {
 	int usecs;
@@ -491,6 +491,7 @@ static int period_to_usecs(struct snd_pcm_runtime *runtime)
 
 	return usecs;
 }
+#endif
 
 static void snd_pcm_set_state(struct snd_pcm_substream *substream, int state)
 {
@@ -504,7 +505,7 @@ static int snd_pcm_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *params)
 {
 	struct snd_pcm_runtime *runtime;
-	int err, usecs;
+	int err/* , usecs*/;
 	unsigned int bits;
 	snd_pcm_uframes_t frames;
 
@@ -1796,6 +1797,31 @@ static int snd_pcm_drop(struct snd_pcm_substream *substream)
 	return result;
 }
 
+/* WARNING: Don't forget to fput back the file */
+static struct file *snd_pcm_file_fd(int fd)
+{
+	struct file *file;
+	struct inode *inode;
+	unsigned int minor;
+
+	file = fget(fd);
+	if (!file)
+		return NULL;
+	inode = file->f_path.dentry->d_inode;
+	if (!S_ISCHR(inode->i_mode) ||
+	    imajor(inode) != snd_major) {
+		fput(file);
+		return NULL;
+	}
+	minor = iminor(inode);
+	if (!snd_lookup_minor_data(minor, SNDRV_DEVICE_TYPE_PCM_PLAYBACK) &&
+	    !snd_lookup_minor_data(minor, SNDRV_DEVICE_TYPE_PCM_CAPTURE)) {
+		fput(file);
+		return NULL;
+	}
+	return file;
+}
+
 #if 0
 static bool is_pcm_file(struct file *file)
 {
@@ -1814,6 +1840,7 @@ static bool is_pcm_file(struct file *file)
  */
 static int snd_pcm_link(struct snd_pcm_substream *substream, int fd)
 {
+#if 0
 	return -EBUSY;
 #if 0
 	int res = 0;
@@ -1869,6 +1896,58 @@ static int snd_pcm_link(struct snd_pcm_substream *substream, int fd)
 	kfree(group);
  _badf:
 	fdput(f);
+	return res;
+#endif
+#else
+	int res = 0;
+	struct file *file;
+	struct snd_pcm_file *pcm_file;
+	struct snd_pcm_substream *substream1;
+	struct snd_pcm_group *group;
+
+	file = snd_pcm_file_fd(fd);
+	if (!file)
+		return -EBADFD;
+	pcm_file = file->private_data;
+	substream1 = pcm_file->substream;
+
+	group = kmalloc(sizeof(*group), GFP_KERNEL);
+	if (!group) {
+		res = -ENOMEM;
+		goto _nolock;
+	}
+	down_write_nonblock(&snd_pcm_link_rwsem);
+	write_lock_irq(&snd_pcm_link_rwlock);
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN ||
+	    substream->runtime->status->state != substream1->runtime->status->state ||
+	    substream->pcm->nonatomic != substream1->pcm->nonatomic) {
+		res = -EBADFD;
+		goto _end;
+	}
+	if (snd_pcm_stream_linked(substream1)) {
+		res = -EALREADY;
+		goto _end;
+	}
+	if (!snd_pcm_stream_linked(substream)) {
+		substream->group = group;
+		group = NULL;
+		spin_lock_init(&substream->group->lock);
+		mutex_init(&substream->group->mutex);
+		INIT_LIST_HEAD(&substream->group->substreams);
+		list_add_tail(&substream->link_list, &substream->group->substreams);
+		substream->group->count = 1;
+	}
+	list_add_tail(&substream1->link_list, &substream->group->substreams);
+	substream->group->count++;
+	substream1->group = substream->group;
+ _end:
+	write_unlock_irq(&snd_pcm_link_rwlock);
+	up_write(&snd_pcm_link_rwsem);
+ _nolock:
+	snd_card_unref(substream1->pcm->card);
+	kfree(group);
+ _badf:
+	fput(file);
 	return res;
 #endif
 }
@@ -3091,8 +3170,8 @@ static ssize_t snd_pcm_write(struct file *file, const char __user *buf,
 		result = frames_to_bytes(runtime, result);
 	return result;
 }
-#if 0
-static ssize_t snd_pcm_readv(struct kiocb *iocb, struct iov_iter *to)
+static ssize_t snd_pcm_aio_read(struct kiocb *iocb, const struct iovec *iov,
+                             unsigned long nr_segs, loff_t pos)
 {
 	struct snd_pcm_file *pcm_file;
 	struct snd_pcm_substream *substream;
@@ -3109,20 +3188,16 @@ static ssize_t snd_pcm_readv(struct kiocb *iocb, struct iov_iter *to)
 	runtime = substream->runtime;
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 		return -EBADFD;
-#if 0
-	if (!iter_is_iovec(to))
+	if (nr_segs > 1024 || nr_segs != runtime->channels)
 		return -EINVAL;
-#endif
-	if (to->nr_segs > 1024 || to->nr_segs != runtime->channels)
+	if (!frame_aligned(runtime, iov->iov_len))
 		return -EINVAL;
-	if (!frame_aligned(runtime, to->iov->iov_len))
-		return -EINVAL;
-	frames = bytes_to_samples(runtime, to->iov->iov_len);
-	bufs = kmalloc(sizeof(void *) * to->nr_segs, GFP_KERNEL);
+	frames = bytes_to_samples(runtime, iov->iov_len);
+	bufs = kmalloc(sizeof(void *) * nr_segs, GFP_KERNEL);
 	if (bufs == NULL)
 		return -ENOMEM;
-	for (i = 0; i < to->nr_segs; ++i)
-		bufs[i] = to->iov[i].iov_base;
+	for (i = 0; i < nr_segs; ++i)
+		bufs[i] = iov[i].iov_base;
 	result = snd_pcm_lib_readv(substream, bufs, frames);
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
@@ -3130,7 +3205,8 @@ static ssize_t snd_pcm_readv(struct kiocb *iocb, struct iov_iter *to)
 	return result;
 }
 
-static ssize_t snd_pcm_writev(struct kiocb *iocb, struct iov_iter *from)
+static ssize_t snd_pcm_aio_write(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t pos)
 {
 	struct snd_pcm_file *pcm_file;
 	struct snd_pcm_substream *substream;
@@ -3147,26 +3223,21 @@ static ssize_t snd_pcm_writev(struct kiocb *iocb, struct iov_iter *from)
 	runtime = substream->runtime;
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 		return -EBADFD;
-#if 0
-	if (!iter_is_iovec(from))
+	if (nr_segs > 128 || nr_segs != runtime->channels ||
+	    !frame_aligned(runtime, iov->iov_len))
 		return -EINVAL;
-#endif
-	if (from->nr_segs > 128 || from->nr_segs != runtime->channels ||
-	    !frame_aligned(runtime, from->iov->iov_len))
-		return -EINVAL;
-	frames = bytes_to_samples(runtime, from->iov->iov_len);
-	bufs = kmalloc(sizeof(void *) * from->nr_segs, GFP_KERNEL);
+	frames = bytes_to_samples(runtime, iov->iov_len);
+        bufs = kmalloc(sizeof(void *) * nr_segs, GFP_KERNEL);
 	if (bufs == NULL)
 		return -ENOMEM;
-	for (i = 0; i < from->nr_segs; ++i)
-		bufs[i] = from->iov[i].iov_base;
+	for (i = 0; i < nr_segs; ++i)
+		bufs[i] = iov[i].iov_base;
 	result = snd_pcm_lib_writev(substream, bufs, frames);
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
 	kfree(bufs);
 	return result;
 }
-#endif
 
 static unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 {
@@ -3702,9 +3773,7 @@ const struct file_operations snd_pcm_f_ops[2] = {
 	{
 		.owner =		THIS_MODULE,
 		.write =		snd_pcm_write,
-#if 0
-		.write_iter =		snd_pcm_writev,
-#endif
+		.aio_write =		snd_pcm_aio_write,
 		.open =			snd_pcm_playback_open,
 		.release =		snd_pcm_release,
 		.llseek =		no_llseek,
@@ -3718,9 +3787,7 @@ const struct file_operations snd_pcm_f_ops[2] = {
 	{
 		.owner =		THIS_MODULE,
 		.read =			snd_pcm_read,
-#if 0
-		.read_iter =		snd_pcm_readv,
-#endif
+		.aio_read = 		snd_pcm_aio_read,
 		.open =			snd_pcm_capture_open,
 		.release =		snd_pcm_release,
 		.llseek =		no_llseek,

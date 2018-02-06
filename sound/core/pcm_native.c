@@ -1840,65 +1840,6 @@ static bool is_pcm_file(struct file *file)
  */
 static int snd_pcm_link(struct snd_pcm_substream *substream, int fd)
 {
-#if 0
-	return -EBUSY;
-#if 0
-	int res = 0;
-	struct snd_pcm_file *pcm_file;
-	struct snd_pcm_substream *substream1;
-	struct snd_pcm_group *group;
-	struct fd f = fdget(fd);
-
-	if (!f.file)
-		return -EBADFD;
-#if 0
-	if (!is_pcm_file(f.file)) {
-		res = -EBADFD;
-		goto _badf;
-	}
-#endif
-	pcm_file = f.file->private_data;
-	substream1 = pcm_file->substream;
-	group = kmalloc(sizeof(*group), GFP_KERNEL);
-	if (!group) {
-		res = -ENOMEM;
-		goto _nolock;
-	}
-	down_write_nonblock(&snd_pcm_link_rwsem);
-	write_lock_irq(&snd_pcm_link_rwlock);
-	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN ||
-	    substream->runtime->status->state != substream1->runtime->status->state ||
-	    substream->pcm->nonatomic != substream1->pcm->nonatomic) {
-		res = -EBADFD;
-		goto _end;
-	}
-	if (snd_pcm_stream_linked(substream1)) {
-		res = -EALREADY;
-		goto _end;
-	}
-	if (!snd_pcm_stream_linked(substream)) {
-		substream->group = group;
-		group = NULL;
-		spin_lock_init(&substream->group->lock);
-		mutex_init(&substream->group->mutex);
-		INIT_LIST_HEAD(&substream->group->substreams);
-		list_add_tail(&substream->link_list, &substream->group->substreams);
-		substream->group->count = 1;
-	}
-	list_add_tail(&substream1->link_list, &substream->group->substreams);
-	substream->group->count++;
-	substream1->group = substream->group;
- _end:
-	write_unlock_irq(&snd_pcm_link_rwlock);
-	up_write(&snd_pcm_link_rwsem);
- _nolock:
-	snd_card_unref(substream1->pcm->card);
-	kfree(group);
- _badf:
-	fdput(f);
-	return res;
-#endif
-#else
 	int res = 0;
 	struct file *file;
 	struct snd_pcm_file *pcm_file;
@@ -1949,7 +1890,6 @@ static int snd_pcm_link(struct snd_pcm_substream *substream, int fd)
  _badf:
 	fput(file);
 	return res;
-#endif
 }
 
 static void relink_to_local(struct snd_pcm_substream *substream)
@@ -3482,11 +3422,7 @@ static const struct vm_operations_struct snd_pcm_vm_ops_data_fault = {
 int snd_pcm_lib_default_mmap(struct snd_pcm_substream *substream,
 			     struct vm_area_struct *area)
 {
-#if 0
-	area->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
-#else
-	area->vm_flags |= VM_DONTEXPAND;
-#endif
+	area->vm_flags |= VM_RESERVED;
 #ifdef CONFIG_GENERIC_ALLOCATOR
 	if (substream->dma_buffer.dev.type == SNDRV_DMA_TYPE_DEV_IRAM) {
 		area->vm_page_prot = pgprot_writecombine(area->vm_page_prot);

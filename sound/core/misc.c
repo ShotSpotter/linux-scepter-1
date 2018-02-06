@@ -20,9 +20,6 @@
  */
 
 #include <linux/init.h>
-#if 0
-#include <linux/export.h>
-#endif
 #include <linux/moduleparam.h>
 #include <linux/time.h>
 #include <linux/slab.h>
@@ -68,39 +65,6 @@ static const char *sanity_file_name(const char *path)
 void __snd_printk(unsigned int level, const char *path, int line,
 		  const char *format, ...)
 {
-#if 0
-	/* HY-DBG */	
-	va_list args;
-#ifdef CONFIG_SND_VERBOSE_PRINTK
-	int kern_level;
-	struct va_format vaf;
-	char verbose_fmt[] = KERN_DEFAULT "ALSA %s:%d %pV";
-#endif
-
-#ifdef CONFIG_SND_DEBUG
-	if (debug < level)
-		return;
-#endif
-
-	va_start(args, format);
-#ifdef CONFIG_SND_VERBOSE_PRINTK
-	vaf.fmt = format;
-	vaf.va = &args;
-
-	kern_level = printk_get_level(format);
-	if (kern_level) {
-		const char *end_of_header = printk_skip_level(format);
-		memcpy(verbose_fmt, format, end_of_header - format);
-		vaf.fmt = end_of_header;
-	} else if (level)
-		memcpy(verbose_fmt, KERN_DEBUG, sizeof(KERN_DEBUG) - 1);
-	printk(verbose_fmt, sanity_file_name(path), line, &vaf);
-
-#else
-	vprintk(format, args);
-#endif
-	va_end(args);
-#endif
 }
 EXPORT_SYMBOL_GPL(__snd_printk);
 #endif

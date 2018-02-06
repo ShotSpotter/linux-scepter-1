@@ -38,15 +38,6 @@
 /* internal flags */
 #define SNDRV_TIMER_IFLG_PAUSED		0x00010000
 
-#if 0
-#if IS_ENABLED(CONFIG_SND_HRTIMER)
-#define DEFAULT_TIMER_LIMIT 4
-#elif IS_ENABLED(CONFIG_SND_RTCTIMER)
-#define DEFAULT_TIMER_LIMIT 2
-#else
-#define DEFAULT_TIMER_LIMIT 1
-#endif
-#else
 #if defined(CONFIG_SND_HRTIMER)
 #define DEFAULT_TIMER_LIMIT 4
 #elif defined(CONFIG_SND_RTCTIMER)
@@ -56,8 +47,6 @@
 #endif
 
 
-
-#endif
 
 static int timer_limit = DEFAULT_TIMER_LIMIT;
 static int timer_tstamp_monotonic = 1;
@@ -889,10 +878,6 @@ static int snd_timer_free(struct snd_timer *timer)
 	if (! list_empty(&timer->open_list_head)) {
 		struct list_head *p, *n;
 		struct snd_timer_instance *ti;
-#if 0
-		/* HY-DBG */
-		pr_warn("ALSA: timer %p is busy?\n", timer);
-#endif
 		list_for_each_safe(p, n, &timer->open_list_head) {
 			list_del_init(p);
 			ti = list_entry(p, struct snd_timer_instance, open_list);

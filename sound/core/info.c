@@ -434,13 +434,6 @@ static int snd_info_entry_release(struct inode *inode, struct file *file)
 						dev_warn(entry->card->dev, "info: data write error to %s (%i)\n",
 							 entry->name,
 							 data->wbuffer->error);
-#if 0
-					/* HY-DBG */
-					else
-						pr_warn("ALSA: info: data write error to %s (%i)\n",
-							entry->name,
-							data->wbuffer->error);
-#endif
 				}
 			}
 			kfree(data->wbuffer->buffer);

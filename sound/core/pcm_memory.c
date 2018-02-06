@@ -25,9 +25,6 @@
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
-#if 0
-#include <linux/export.h>
-#endif
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
@@ -66,13 +63,6 @@ static int preallocate_pcm_pages(struct snd_pcm_substream *substream, size_t siz
 		size >>= 1;
 	} while (size >= snd_minimum_buffer);
 	dmab->bytes = 0; /* tell error */
-#if 0
-	/* HY-DBG */
-	pr_warn("ALSA pcmC%dD%d%c,%d:%s: cannot preallocate for size %zu\n",
-		substream->pcm->card->number, substream->pcm->device,
-		substream->stream ? 'c' : 'p', substream->number,
-		substream->pcm->name, orig_size);
-#endif
 	return 0;
 }
 

@@ -182,10 +182,6 @@ static const struct file_operations snd_fops =
 {
 	.owner =	THIS_MODULE,
 	.open =		snd_open,
-#if 0
-	/* HY-DBG */
-	.llseek =	noop_llseek,
-#endif
 };
 
 #ifdef CONFIG_SND_DYNAMIC_MINORS

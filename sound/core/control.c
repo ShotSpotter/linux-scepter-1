@@ -279,12 +279,6 @@ struct snd_kcontrol *snd_ctl_new1(const struct snd_kcontrol_new *ncontrol,
 	kctl->id.subdevice = ncontrol->subdevice;
 	if (ncontrol->name) {
 		strlcpy(kctl->id.name, ncontrol->name, sizeof(kctl->id.name));
-#if 0
-		/* HY-DBG */
-		if (strcmp(ncontrol->name, kctl->id.name) != 0)
-			pr_warn("ALSA: Control name '%s' truncated to '%s'\n",
-				ncontrol->name, kctl->id.name);
-#endif
 	}
 	kctl->id.index = ncontrol->index;
 

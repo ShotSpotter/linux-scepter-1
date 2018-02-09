@@ -903,18 +903,8 @@ static struct snd_soc_component *soc_find_component(
 	lockdep_assert_held(&client_mutex);
 
 	list_for_each_entry(component, &component_list, list) {
-#if 0
-		if (of_node) {
-			if (component->dev->of_node == of_node)
-				return component;
-		} else if (strcmp(component->name, name) == 0) {
-			return component;
-		}
-#else
-		/* HY-DBG XXX */
 		if (strcmp(component->name, name) == 0)
 			return component;
-#endif
 	}
 
 	return NULL;
@@ -3553,45 +3543,31 @@ static int snd_soc_get_dai_name(struct of_phandle_args *args,
 	int ret = -EPROBE_DEFER;
 
 	mutex_lock(&client_mutex);
-	/* HY-DBG: ???? */
 	list_for_each_entry(pos, &component_list, list) {
-#if 0
-		if (pos->dev->of_node != args->np)
-			continue;
-		if (pos->driver->of_xlate_dai_name) {
-			ret = pos->driver->of_xlate_dai_name(pos,
-							     args,
-							     dai_name);
-		} else {
-#endif
-			int id = -1;
+		int id = -1;
 
-			switch (args->args_count) {
-			case 0:
-				id = 0; /* same as dai_drv[0] */
-				break;
-			case 1:
-				id = args->args[0];
-				break;
-			default:
-				/* not supported */
-				break;
-			}
-
-			if (id < 0 || id >= pos->num_dai) {
-				ret = -EINVAL;
-				continue;
-			}
-
-			ret = 0;
-
-			*dai_name = pos->dai_drv[id].name;
-			if (!*dai_name)
-				*dai_name = pos->name;
-#if 0
+		switch (args->args_count) {
+		case 0:
+			id = 0; /* same as dai_drv[0] */
+			break;
+		case 1:
+			id = args->args[0];
+			break;
+		default:
+			/* not supported */
+			break;
 		}
-#endif
 
+		if (id < 0 || id >= pos->num_dai) {
+			ret = -EINVAL;
+			continue;
+		}
+
+		ret = 0;
+
+		*dai_name = pos->dai_drv[id].name;
+		if (!*dai_name)
+			*dai_name = pos->name;
 		break;
 	}
 	mutex_unlock(&client_mutex);

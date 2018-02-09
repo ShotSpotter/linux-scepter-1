@@ -42,9 +42,6 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/initval.h>
-#if 0
-#include <trace/events/asoc.h>
-#endif
 
 #define devm_kmemdup(a, b, c, d)	kmemdup(b, c, d)
 #define devm_kasprintf(a, b...)		kasprintf(b)
@@ -545,9 +542,6 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_dapm_context *dapm,
 {
 	struct snd_soc_card *card = dapm->card;
 	int ret = 0;
-#if 0
-	trace_snd_soc_bias_level_start(card, level);
-#endif
 
 	if (card && card->set_bias_level)
 		ret = card->set_bias_level(card, dapm, level);
@@ -565,9 +559,6 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_dapm_context *dapm,
 	if (card && card->set_bias_level_post)
 		ret = card->set_bias_level_post(card, dapm, level);
 out:
-#if 0
-	trace_snd_soc_bias_level_done(card, level);
-#endif
 	return ret;
 }
 
@@ -968,9 +959,6 @@ static int is_connected_output_ep(struct snd_soc_dapm_widget *widget,
 
 		if (path->walking)
 			return 1;
-#if 0
-		trace_snd_soc_dapm_output_path(widget, path);
-#endif
 
 		if (path->connect) {
 			path->walking = 1;
@@ -1027,9 +1015,6 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget,
 
 		if (path->walking)
 			return 1;
-#if 0
-		trace_snd_soc_dapm_input_path(widget, path);
-#endif
 
 		if (path->connect) {
 			path->walking = 1;
@@ -1092,9 +1077,6 @@ int snd_soc_dapm_dai_get_connected_widgets(struct snd_soc_dai *dai, int stream,
 		paths = is_connected_output_ep(dai->playback_widget, list);
 	else
 		paths = is_connected_input_ep(dai->capture_widget, list);
-#if 0
-	trace_snd_soc_dapm_connected(paths, stream);
-#endif
 	mutex_unlock(&card->dapm_mutex);
 
 	return paths;
@@ -1111,33 +1093,9 @@ int dapm_regulator_event(struct snd_soc_dapm_widget *w,
 	soc_dapm_async_complete(w->dapm);
 
 	if (SND_SOC_DAPM_EVENT_ON(event)) {
-#if 0
-		if (w->on_val & SND_SOC_DAPM_REGULATOR_BYPASS) {
-			ret = regulator_allow_bypass(w->regulator, false);
-			if (ret != 0)
-				dev_warn(w->dapm->dev,
-					 "ASoC: Failed to unbypass %s: %d\n",
-					 w->name, ret);
-		}
-#endif
 		return regulator_enable(w->regulator);
 	} else {
-#if 0
-		if (w->on_val & SND_SOC_DAPM_REGULATOR_BYPASS) {
-			ret = regulator_allow_bypass(w->regulator, true);
-			if (ret != 0)
-				dev_warn(w->dapm->dev,
-					 "ASoC: Failed to bypass %s: %d\n",
-					 w->name, ret);
-		}
-#endif
-#if 0
-		return regulator_disable_deferred(w->regulator, w->shift);
-#else
-		/* HY-DBG */
 		return regulator_disable(w->regulator);
-
-#endif
 	}
 }
 EXPORT_SYMBOL_GPL(dapm_regulator_event);
@@ -1309,13 +1267,7 @@ static void dapm_seq_check_event(struct snd_soc_card *card,
 		pop_dbg(w->dapm->dev, card->pop_time, "pop test : %s %s\n",
 			w->name, ev_name);
 		soc_dapm_async_complete(w->dapm);
-#if 0
-		trace_snd_soc_dapm_widget_event_start(w, event);
-#endif
 		ret = w->event(w, NULL, event);
-#if 0
-		trace_snd_soc_dapm_widget_event_done(w, event);
-#endif
 		if (ret < 0)
 			dev_err(w->dapm->dev, "ASoC: %s: %s event failed: %d\n",
 			       ev_name, w->name, ret);
@@ -1623,9 +1575,6 @@ static void dapm_widget_set_power(struct snd_soc_dapm_widget *w, bool power,
 
 	if (w->power == power)
 		return;
-#if 0
-	trace_snd_soc_dapm_widget_power(w, power);
-#endif
 
 	/* If we changed our power state perhaps our neigbours changed
 	 * also.
@@ -1699,15 +1648,9 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	struct snd_soc_dapm_context *d;
 	LIST_HEAD(up_list);
 	LIST_HEAD(down_list);
-#if 0
-	ASYNC_DOMAIN_EXCLUSIVE(async_domain);
-#endif
 	enum snd_soc_bias_level bias;
 
 	lockdep_assert_held(&card->dapm_mutex);
-#if 0
-	trace_snd_soc_dapm_start(card);
-#endif
 
 	list_for_each_entry(d, &card->dapm_list, list) {
 		if (dapm_idle_bias_off(d))
@@ -1778,22 +1721,15 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	list_for_each_entry(d, &card->dapm_list, list)
 		if (!dapm_idle_bias_off(d))
 			d->target_bias_level = bias;
-#if 0
-	trace_snd_soc_dapm_walk_done(card);
-#endif
 
 	/* Run card bias changes at first */
 	dapm_pre_sequence_async(&card->dapm, 0);
 	/* Run other bias changes in parallel */
-#if 0
-	/* HY-DBG: XXX - need to break this out. */
+	/* HY-DBG: synchronous 2.6 as it lacks async support */
 	list_for_each_entry(d, &card->dapm_list, list) {
-		if (d != &card->dapm)
-			async_schedule_domain(dapm_pre_sequence_async, d,
-						&async_domain);
+		if (d != &card->dapm) 
+			dapm_pre_sequence_async(d, 0);
 	}
-	async_synchronize_full_domain(&async_domain);
-#endif
 
 	list_for_each_entry(w, &down_list, power_list) {
 		dapm_seq_check_event(card, w, SND_SOC_DAPM_WILL_PMD);
@@ -1810,16 +1746,10 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 
 	/* Now power up. */
 	dapm_seq_run(card, &up_list, event, true);
-#if 0
-	/* HY-DBG: Need to break this out */
-	/* Run all the bias changes in parallel */
 	list_for_each_entry(d, &card->dapm_list, list) {
 		if (d != &card->dapm)
-			async_schedule_domain(dapm_post_sequence_async, d,
-						&async_domain);
+			dapm_post_sequence_async(d, 0);
 	}
-	async_synchronize_full_domain(&async_domain);
-#endif
 	/* Run card bias changes at last */
 	dapm_post_sequence_async(&card->dapm, 0);
 
@@ -1832,9 +1762,6 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	pop_dbg(card->dev, card->pop_time,
 		"DAPM sequencing finished, waiting %dms\n", card->pop_time);
 	pop_wait(card->pop_time);
-#if 0
-	trace_snd_soc_dapm_done(card);
-#endif
 
 	return 0;
 }
@@ -3116,15 +3043,6 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 				w->name, ret);
 			return NULL;
 		}
-#if 0
-		if (w->on_val & SND_SOC_DAPM_REGULATOR_BYPASS) {
-			ret = regulator_allow_bypass(w->regulator, true);
-			if (ret != 0)
-				dev_warn(w->dapm->dev,
-					 "ASoC: Failed to bypass %s: %d\n",
-					 w->name, ret);
-		}
-#endif
 		break;
 	case snd_soc_dapm_clock_supply:
 #ifdef CONFIG_CLKDEV_LOOKUP

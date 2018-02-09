@@ -27,17 +27,24 @@
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#if 0
 #include <linux/of_device.h>
+#endif
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/initval.h>
 #include <sound/soc.h>
+#if 0
 #include <sound/dmaengine_pcm.h>
+#endif
 #include <sound/omap-pcm.h>
-
+#if 1
 #include <linux/platform_data/asoc-ti-mcbsp.h>
 #include "mcbsp.h"
+#else
+#include <plat/mcbsp.h>
+#endif
 #include "omap-mcbsp.h"
 
 #define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000)
@@ -222,13 +229,19 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 {
 	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 	struct omap_mcbsp_reg_cfg *regs = &mcbsp->cfg_regs;
+#if 0
+	/* HY-DBG XXX */
 	struct snd_dmaengine_dai_dma_data *dma_data;
+#endif
 	int wlen, channels, wpf;
 	int pkt_size = 0;
 	unsigned int format, div, framesize, master;
 
 	printk(KERN_ERR "mcbsp: in dai hw params\n");
+#if 0
+	/* HY-DBG XXX */
 	dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
+#endif
 // 	printk(KERN_ERR "mcbsp dma_data: %x \n", 
 	channels = params_channels(params);
 
@@ -278,8 +291,10 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		}
 		omap_mcbsp_set_threshold(substream, pkt_size);
 	}
-
+#if 0
+	/* HY-DBG XXX */
 	dma_data->maxburst = pkt_size;
+#endif
 
 	if (mcbsp->configured) {
 		printk(KERN_ERR "McBSP already configured by another stream\n");
@@ -637,10 +652,12 @@ static int omap_mcbsp_probe(struct snd_soc_dai *dai)
 	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(dai);
 
 	pm_runtime_enable(mcbsp->dev);
-
+#if 0
+	/* HY-DBG XXX */
 	snd_soc_dai_init_dma_data(dai,
 				  &mcbsp->dma_data[SNDRV_PCM_STREAM_PLAYBACK],
 				  &mcbsp->dma_data[SNDRV_PCM_STREAM_CAPTURE]);
+#endif
 
 	return 0;
 }
@@ -854,7 +871,7 @@ static int asoc_mcbsp_probe(struct platform_device *pdev)
 	struct omap_mcbsp *mcbsp;
 	const struct of_device_id *match;
 	int ret;
-
+#if 0
 	match = of_match_device(omap_mcbsp_of_match, &pdev->dev);
 	if (match) {
 		struct device_node *node = pdev->dev.of_node;
@@ -869,7 +886,9 @@ static int asoc_mcbsp_probe(struct platform_device *pdev)
 		memcpy(pdata, match->data, sizeof(*pdata));
 		if (!of_property_read_u32(node, "ti,buffer-size", &buffer_size))
 			pdata->buffer_size = buffer_size;
-	} else if (!pdata) {
+	} else
+#endif
+ 	if (!pdata) {
 		dev_err(&pdev->dev, "missing platform data.\n");
 		return -EINVAL;
 	}
@@ -912,7 +931,9 @@ static int asoc_mcbsp_remove(struct platform_device *pdev)
 static struct platform_driver asoc_mcbsp_driver = {
 	.driver = {
 			.name = "omap-mcbsp",
+#if 0
 			.of_match_table = omap_mcbsp_of_match,
+#endif
 	},
 
 	.probe = asoc_mcbsp_probe,

@@ -1,6 +1,6 @@
 config SND_OMAP_SOC
 	tristate "SoC Audio for the Texas Instruments OMAP chips"
-	depends on (ARCH_OMAP && DMA_OMAP) || (ARM && COMPILE_TEST)
+	depends on ARCH_OMAP || (ARM && COMPILE_TEST)
 	select SND_DMAENGINE_PCM
 
 config SND_OMAP_SOC_DMIC
@@ -76,7 +76,7 @@ config SND_OMAP_SOC_OSK5912
 
 config SND_OMAP_SOC_AM3517EVM
 	tristate "SoC Audio support for OMAP3517 / AM3517 EVM"
-	depends on SND_OMAP_SOC && MACH_OMAP3517EVM && I2C
+	depends on SND_OMAP_SOC && I2C
 	select SND_OMAP_SOC_MCBSP
 	select SND_SOC_TLV320AIC23_I2C
 	help

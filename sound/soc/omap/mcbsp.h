@@ -29,8 +29,9 @@
 #else
 #define mcbsp_omap1()	0
 #endif
-
+#if 0
 #include <sound/dmaengine_pcm.h>
+#endif
 
 /* McBSP register numbers. Register address offset = num * reg_step */
 enum {
@@ -312,7 +313,9 @@ struct omap_mcbsp {
 	struct omap_mcbsp_platform_data *pdata;
 	struct omap_mcbsp_st_data *st_data;
 	struct omap_mcbsp_reg_cfg cfg_regs;
+#if 0
 	struct snd_dmaengine_dai_dma_data dma_data[2];
+#endif
 	unsigned int dma_req[2];
 	int dma_op_mode;
 	u16 max_tx_thres;

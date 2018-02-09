@@ -1786,13 +1786,18 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	dapm_pre_sequence_async(&card->dapm, 0);
 	/* Run other bias changes in parallel */
 #if 0
-	/* HY-DBG: XXX - need to break this out. */
 	list_for_each_entry(d, &card->dapm_list, list) {
 		if (d != &card->dapm)
 			async_schedule_domain(dapm_pre_sequence_async, d,
 						&async_domain);
 	}
 	async_synchronize_full_domain(&async_domain);
+#else
+	/* HY-DBG: synchronous 2.6 as it lacks async support */
+	list_for_each_entry(d, &card->dapm_list, list) {
+		if (d != &card->dapm) 
+			dapm_pre_sequence_async(d, 0);
+	}
 #endif
 
 	list_for_each_entry(w, &down_list, power_list) {
@@ -1819,6 +1824,11 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 						&async_domain);
 	}
 	async_synchronize_full_domain(&async_domain);
+#else
+	list_for_each_entry(d, &card->dapm_list, list) {
+		if (d != &card->dapm)
+			dapm_post_sequence_async(d, 0);
+	}
 #endif
 	/* Run card bias changes at last */
 	dapm_post_sequence_async(&card->dapm, 0);

@@ -46,7 +46,7 @@ static int asoc_simple_card_startup(struct snd_pcm_substream *substream)
 	struct simple_dai_props *dai_props =
 		&priv->dai_props[rtd - rtd->card->rtd];
 	int ret;
-
+#if 0
 	ret = clk_prepare_enable(dai_props->cpu_dai.clk);
 	if (ret)
 		return ret;
@@ -54,7 +54,7 @@ static int asoc_simple_card_startup(struct snd_pcm_substream *substream)
 	ret = clk_prepare_enable(dai_props->codec_dai.clk);
 	if (ret)
 		clk_disable_unprepare(dai_props->cpu_dai.clk);
-
+#endif
 	return ret;
 }
 
@@ -64,10 +64,11 @@ static void asoc_simple_card_shutdown(struct snd_pcm_substream *substream)
 	struct simple_card_data *priv =	snd_soc_card_get_drvdata(rtd->card);
 	struct simple_dai_props *dai_props =
 		&priv->dai_props[rtd - rtd->card->rtd];
-
+#if 0
 	clk_disable_unprepare(dai_props->cpu_dai.clk);
 
 	clk_disable_unprepare(dai_props->codec_dai.clk);
+#endif
 }
 
 static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
@@ -193,7 +194,7 @@ static int asoc_simple_card_dai_init(struct snd_soc_pcm_runtime *rtd)
 	}
 	return 0;
 }
-
+#if 0
 static int
 asoc_simple_card_sub_parse_of(struct device_node *np,
 			      struct asoc_simple_dai *dai,
@@ -255,6 +256,7 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
 
 	return 0;
 }
+#endif
 
 static int asoc_simple_card_parse_daifmt(struct device_node *node,
 					 struct simple_card_data *priv,
@@ -309,13 +311,13 @@ static int asoc_simple_card_parse_daifmt(struct device_node *node,
 	}
 
 	dai_link->dai_fmt = daifmt;
-
+#if 0
 	of_node_put(bitclkmaster);
 	of_node_put(framemaster);
-
+#endif
 	return 0;
 }
-
+#if 0
 static int asoc_simple_card_dai_link_of(struct device_node *node,
 					struct simple_card_data *priv,
 					int idx,
@@ -351,7 +353,7 @@ static int asoc_simple_card_dai_link_of(struct device_node *node,
 					    codec, prefix, idx);
 	if (ret < 0)
 		goto dai_link_of_err;
-
+#if 0
 	ret = asoc_simple_card_sub_parse_of(cpu, &dai_props->cpu_dai,
 					    &dai_link->cpu_of_node,
 					    &dai_link->cpu_dai_name,
@@ -364,6 +366,7 @@ static int asoc_simple_card_dai_link_of(struct device_node *node,
 					    &dai_link->codec_dai_name, NULL);
 	if (ret < 0)
 		goto dai_link_of_err;
+#endif
 
 	if (!dai_link->cpu_dai_name || !dai_link->codec_dai_name) {
 		ret = -EINVAL;
@@ -416,7 +419,8 @@ dai_link_of_err:
 
 	return ret;
 }
-
+#endif
+#if 0
 static int asoc_simple_card_parse_of(struct device_node *node,
 				     struct simple_card_data *priv)
 {
@@ -494,7 +498,8 @@ static int asoc_simple_card_parse_of(struct device_node *node,
 
 	return 0;
 }
-
+#endif
+#if 0
 /* Decrease the reference count of the device nodes */
 static int asoc_simple_card_unref(struct snd_soc_card *card)
 {
@@ -509,20 +514,26 @@ static int asoc_simple_card_unref(struct snd_soc_card *card)
 	}
 	return 0;
 }
-
+#endif
 static int asoc_simple_card_probe(struct platform_device *pdev)
 {
 	struct simple_card_data *priv;
 	struct snd_soc_dai_link *dai_link;
+#if 0
 	struct device_node *np = pdev->dev.of_node;
+#endif
 	struct device *dev = &pdev->dev;
 	int num_links, ret;
 
 	/* Get the number of DAI links */
+#if 0
 	if (np && of_get_child_by_name(np, "simple-audio-card,dai-link"))
 		num_links = of_get_child_count(np);
 	else
 		num_links = 1;
+#else
+	num_links = 1;
+#endif
 
 	/* Allocate the private data and the DAI link array */
 	priv = devm_kzalloc(dev,
@@ -547,7 +558,7 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 			GFP_KERNEL);
 	if (!priv->dai_props)
 		return -ENOMEM;
-
+#if 0
 	if (np && of_device_is_available(np)) {
 
 		ret = asoc_simple_card_parse_of(np, priv);
@@ -558,6 +569,7 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 		}
 
 	} else {
+#endif
 		struct asoc_simple_card_info *cinfo;
 
 		cinfo = dev->platform_data;
@@ -589,7 +601,9 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 		memcpy(&priv->dai_props->codec_dai, &cinfo->codec_dai,
 					sizeof(priv->dai_props->codec_dai));
 
+#if 0
 	}
+#endif
 
 	snd_soc_card_set_drvdata(&priv->snd_card, priv);
 
@@ -598,7 +612,9 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 		return ret;
 
 err:
+#if 0
 	asoc_simple_card_unref(&priv->snd_card);
+#endif
 	return ret;
 }
 
@@ -613,20 +629,24 @@ static int asoc_simple_card_remove(struct platform_device *pdev)
 	if (gpio_is_valid(priv->gpio_mic_det))
 		snd_soc_jack_free_gpios(&simple_card_mic_jack, 1,
 					&simple_card_mic_jack_gpio);
-
+#if 0
 	return asoc_simple_card_unref(card);
+#endif
 }
-
+#if 0
 static const struct of_device_id asoc_simple_of_match[] = {
 	{ .compatible = "simple-audio-card", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, asoc_simple_of_match);
+#endif
 
 static struct platform_driver asoc_simple_card = {
 	.driver = {
 		.name = "asoc-simple-card",
+#if 0
 		.of_match_table = asoc_simple_of_match,
+#endif
 	},
 	.probe = asoc_simple_card_probe,
 	.remove = asoc_simple_card_remove,

@@ -911,7 +911,7 @@ static struct snd_soc_component *soc_find_component(
 			return component;
 		}
 #else
-		/* HY-DBG XXX */
+		/* HY-DBG XXX - maybe ok */
 		if (strcmp(component->name, name) == 0)
 			return component;
 #endif

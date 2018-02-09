@@ -42,8 +42,9 @@
 #include <plat/nand.h>
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
-#if 0
+
 #include <sound/wm8737.h>
+#if 0
 #include <plat/wm8737-sync.h>
 #include <sound/soc-dai.h>
 #endif

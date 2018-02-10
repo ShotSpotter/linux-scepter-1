@@ -32,7 +32,8 @@
 #if 0
 #include <sound/dmaengine_pcm.h>
 #endif
-
+#if 0
+#error WTF HUH
 /* McBSP register numbers. Register address offset = num * reg_step */
 enum {
 	/* Common registers */
@@ -288,8 +289,14 @@ struct omap_mcbsp_st_data {
 	s16 ch0gain;
 	s16 ch1gain;
 };
+#else
+#include <plat/mcbsp.h>
+#endif
+struct snd_dmaengine_dai_dma_data {
+        int maxburst;
+};
 
-struct omap_mcbsp {
+struct x_omap_mcbsp {
 	struct device *dev;
 	struct clk *fclk;
 	spinlock_t lock;
@@ -313,9 +320,7 @@ struct omap_mcbsp {
 	struct omap_mcbsp_platform_data *pdata;
 	struct omap_mcbsp_st_data *st_data;
 	struct omap_mcbsp_reg_cfg cfg_regs;
-#if 0
 	struct snd_dmaengine_dai_dma_data dma_data[2];
-#endif
 	unsigned int dma_req[2];
 	int dma_op_mode;
 	u16 max_tx_thres;
@@ -329,29 +334,101 @@ struct omap_mcbsp {
 	int wlen;
 };
 
+#if 0
+/* */
 void omap_mcbsp_config(struct omap_mcbsp *mcbsp,
 		       const struct omap_mcbsp_reg_cfg *config);
+/* */
 void omap_mcbsp_set_tx_threshold(struct omap_mcbsp *mcbsp, u16 threshold);
+/* */
 void omap_mcbsp_set_rx_threshold(struct omap_mcbsp *mcbsp, u16 threshold);
+/* */
 u16 omap_mcbsp_get_tx_delay(struct omap_mcbsp *mcbsp);
+/* */
 u16 omap_mcbsp_get_rx_delay(struct omap_mcbsp *mcbsp);
 int omap_mcbsp_get_dma_op_mode(struct omap_mcbsp *mcbsp);
+/* */
 int omap_mcbsp_request(struct omap_mcbsp *mcbsp);
+/* */
 void omap_mcbsp_free(struct omap_mcbsp *mcbsp);
+/* */
 void omap_mcbsp_start(struct omap_mcbsp *mcbsp, int tx, int rx);
+/* */
 void omap_mcbsp_stop(struct omap_mcbsp *mcbsp, int tx, int rx);
 
 /* McBSP functional clock source changing function */
+/* */
 int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id);
 
 /* Sidetone specific API */
+/* */
 int omap_st_set_chgain(struct omap_mcbsp *mcbsp, int channel, s16 chgain);
+/* */
 int omap_st_get_chgain(struct omap_mcbsp *mcbsp, int channel, s16 *chgain);
+/* */
 int omap_st_enable(struct omap_mcbsp *mcbsp);
+/* */
 int omap_st_disable(struct omap_mcbsp *mcbsp);
+/* */
 int omap_st_is_enabled(struct omap_mcbsp *mcbsp);
 
+/* */
 int omap_mcbsp_init(struct platform_device *pdev);
+/* */
 void omap_mcbsp_sysfs_remove(struct omap_mcbsp *mcbsp);
+#else
+static inline int x_omap_mcbsp_init(struct platform_device *pdev)
+{
+	return omap_mcbsp_init();
+}
+void x_omap_mcbsp_config(struct x_omap_mcbsp *mcbsp,
+		       const struct omap_mcbsp_reg_cfg *config);
+void x_omap_mcbsp_set_tx_threshold(struct x_omap_mcbsp *mcbsp, u16 threshold);
+void x_omap_mcbsp_set_rx_threshold(struct x_omap_mcbsp *mcbsp, u16 threshold);
+static inline u16 x_omap_mcbsp_get_tx_delay(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_mcbsp_get_tx_delay(mcbsp->id);
+}
+static inline u16 x_omap_mcbsp_get_rx_delay(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_mcbsp_get_rx_delay(mcbsp->id);
+}
+static inline int x_omap_mcbsp_request(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_mcbsp_request(mcbsp->id);
+}
+
+void x_omap_mcbsp_free(struct x_omap_mcbsp *mcbsp);
+void x_omap_mcbsp_start(struct x_omap_mcbsp *mcbsp, int tx, int rx);
+void x_omap_mcbsp_stop(struct x_omap_mcbsp *mcbsp, int tx, int rx);
+#if 0
+/* McBSP functional clock source changing function */
+int omap2_mcbsp_set_clks_src(struct x_omap_mcbsp *mcbsp, u8 fck_src_id);
+#endif
+/* Sidetone specific API */
+static inline int x_omap_st_set_chgain(struct x_omap_mcbsp *mcbsp, int channel, s16 chgain)
+{
+	return omap_st_set_chgain(mcbsp->id, channel, chgain);
+}
+static inline int x_omap_st_get_chgain(struct x_omap_mcbsp *mcbsp, int channel, s16 *chgain)
+{
+	return omap_st_get_chgain(mcbsp->id, channel, chgain);
+}
+static inline int x_omap_st_enable(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_st_enable(mcbsp->id);
+}
+
+static inline int x_omap_st_disable(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_st_disable(mcbsp->id);
+}
+static inline int x_omap_st_is_enabled(struct x_omap_mcbsp *mcbsp)
+{
+	return omap_st_is_enabled(mcbsp->id);
+}
+void x_omap_mcbsp_sysfs_remove(struct x_omap_mcbsp *mcbsp);
+
+#endif
 
 #endif /* __ASOC_MCBSP_H */

@@ -33,7 +33,6 @@
 #include <sound/dmaengine_pcm.h>
 #endif
 #if 0
-#error WTF HUH
 /* McBSP register numbers. Register address offset = num * reg_step */
 enum {
 	/* Common registers */

@@ -432,6 +432,11 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 		regs->xccr = DXENDLY(1) | XDMAEN | XDISABLE;
 		regs->rccr = RFULL_CYCLE | RDMAEN | RDISABLE;
 	}
+#else
+	/* HY-DBG: Hard code for OMAP3 */
+	/* has_ccr = true */
+	regs->xccr = DXENDLY(1) | XDMAEN | XDISABLE;
+	regs->rccr = RFULL_CYCLE | RDMAEN | RDISABLE;
 #endif
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {

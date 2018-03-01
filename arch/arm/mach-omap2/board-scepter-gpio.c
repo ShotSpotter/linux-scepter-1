@@ -180,6 +180,16 @@ struct gpio_export_t __initdata scepter_gpio_revb[] =
 			.num = 137,
 			.is_input = 1,
 		},
+		{ .name = "mclk-force",
+			.num = 106,
+			.is_input = 0,
+			.initial_value = 1,
+		},
+		{ .name = "samp_cnt_rst",
+			.num = 84,
+			.is_input = 0,
+			.initial_value = 1,
+		},
 		{
 				.name = NULL
 		}

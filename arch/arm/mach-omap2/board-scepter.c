@@ -42,6 +42,9 @@
 #include <plat/nand.h>
 #include <plat/gpmc.h>
 #include <plat/mmc.h>
+#include <plat/mcbsp.h>
+
+#include <sound/simple_card.h>
 
 #include <sound/wm8737.h>
 #if 0
@@ -502,6 +505,62 @@ static struct platform_device scepter_wm8737_sync = {
 		},
 };
 #endif
+
+/* ------------- HY-DBG --------------- */
+static struct asoc_simple_card_info scepter_master = {
+	.name = "wm8737master0",
+	.codec = "wm8737",
+	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_NB_NF,
+	.cpu_dai = {
+		.name = "omap-mcbsp-0",
+	},
+	.codec_dai = {
+		.name = "wm8737-0",
+		.sysclk = 12288000,
+	},
+};
+static struct asoc_simple_card_info scepter_slave = {
+	.name = "wm8737slave0",
+	.codec = "wm8737",
+	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS | SND_SOC_DAIFMT_NB_NF,
+	.cpu_dai = {
+		.name = "omap-mcbsp-1",
+	},
+	.codec_dai = {
+		.name = "wm8737-1",
+	},
+};
+static struct omap_mcbsp_platform_data scepter_mcbsp1 = {
+	.buffer_size = 128,
+}, scepter_mcbsp2 = {
+	.buffer_size = 128,
+};
+static struct platform_device snd_slave = {
+	.name	= "simple-audio-card",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &scepter_master,
+	},
+}, snd_master = {
+	.name	= "simple-audio-card",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &scepter_slave,
+	},
+}, snd_mcbsp1 = {
+	.name 	= "omap-mcbsp",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &scepter_mcbsp1
+	},
+}, snd_mcbsp2 = {
+	.name 	= "omap-mcbsp",
+	.id	= 1,
+	.dev	= {
+		.platform_data = &scepter_mcbsp2,
+	},
+};
+/* ------------- HY-DBG --------------- */
 static struct platform_device generic_soc_slave = {
 		.name = "asoc-slave-codec",
 		.id = -1,
@@ -583,6 +642,10 @@ static struct platform_device *scepter_devices[] __initdata = {
 	&scepter_wm8737_avdd_mvdd_device,
 	&scepter_wm8737_micbias_device[0],
 	&scepter_wm8737_micbias_device[1],
+	&snd_master,
+	&snd_slave,
+	&snd_mcbsp1,
+	&snd_mcbsp2,
 };
 
 static void __init scepter_init_irq(void)

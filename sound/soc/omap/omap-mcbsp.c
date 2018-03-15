@@ -69,6 +69,14 @@ enum {
 	OMAP_MCBSP_WORD_32,
 };
 #endif
+void x_omap_mcbsp_set_tx_threshold(struct x_omap_mcbsp *mcbsp, u16 words)
+{
+	omap_mcbsp_set_tx_threshold(mcbsp->id, words);
+}
+void x_omap_mcbsp_set_rx_threshold(struct x_omap_mcbsp *mcbsp, u16 words)
+{
+	omap_mcbsp_set_rx_threshold(mcbsp->id, words);
+}
 /*
  * Stream DMA parameters. DMA request line and port address are set runtime
  * since they are different between OMAP1 and later OMAPs
@@ -169,7 +177,7 @@ static void omap_mcbsp_dai_shutdown(struct snd_pcm_substream *substream,
 	struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 
 	if (!cpu_dai->active) {
-		x_omap_mcbsp_free(mcbsp);
+		omap_mcbsp_free(mcbsp->id);
 		mcbsp->configured = 0;
 	}
 }
@@ -185,13 +193,21 @@ static int omap_mcbsp_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		mcbsp->active++;
+#if 0
 		x_omap_mcbsp_start(mcbsp, play, !play);
+#else
+		omap_mcbsp_start(mcbsp->id, play, !play);
+#endif
 		break;
 
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+#if 0
 		x_omap_mcbsp_stop(mcbsp, play, !play);
+#else
+		omap_mcbsp_stop(mcbsp->id, play, !play);
+#endif
 		mcbsp->active--;
 		break;
 	default:
@@ -237,7 +253,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	int pkt_size = 0;
 	unsigned int format, div, framesize, master;
 
-	printk(KERN_ERR "mcbsp: in dai hw params\n");
+	printk(KERN_ERR "mcbsp(%i): in dai hw params\n", mcbsp->id);
 	dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
 // 	printk(KERN_ERR "mcbsp dma_data: %x \n", 
 	channels = params_channels(params);
@@ -245,14 +261,14 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		wlen = 16;
-		printk(KERN_ERR "mcbsp hwparams s16le\n");
+		printk(KERN_ERR "mcbsp %i hwparams s16le\n", mcbsp->id);
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		wlen = 32;
-		printk(KERN_ERR "mcbsp hwparams s32le\n");
+		printk(KERN_ERR "mcbsp %i hwparams s32le\n", mcbsp->id);
 		break;
 	default:
-	printk(KERN_ERR "mcbsp hwparams no format for you\n");
+	printk(KERN_ERR "mcbsp %i hwparams no format for you\n", mcbsp->id);
 		return -EINVAL;
 	}
 	if (mcbsp->pdata->buffer_size) {
@@ -312,9 +328,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		wpf--;
 		regs->rcr2	|= RFRLEN2(wpf - 1);
 		regs->xcr2	|= XFRLEN2(wpf - 1);
-		printk(KERN_ERR "mcbsp: using dual phase frames\n");
+		printk(KERN_ERR "mcbsp %i: using dual phase frames\n", mcbsp->id);
 	} else {
-	printk(KERN_ERR "mcbsp: not using dual phase frames\n");
+	printk(KERN_ERR "mcbsp %i: not using dual phase frames\n", mcbsp->id);
 	}
 
 	regs->rcr1	|= RFRLEN1(wpf - 1);
@@ -327,7 +343,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_16);
 		regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_16);
 		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
-		printk(KERN_ERR "mcbsp: fmt s16le\n");
+		printk(KERN_ERR "mcbsp %i: fmt s16le\n", mcbsp->id);
 
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
@@ -336,10 +352,10 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_32);
 		regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_32);
 		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_32);
-		printk(KERN_ERR "mcbsp: fmt s32le\n");
+		printk(KERN_ERR "mcbsp %i: fmt s32le\n", mcbsp->id);
 		break;
 	default:
-		printk(KERN_ERR "mcbsp: Unsupported PCM format\n");
+		printk(KERN_ERR "mcbsp %i: Unsupported PCM format\n", mcbsp->id);
 		/* Unsupported PCM format */
 		return -EINVAL;
 	}
@@ -348,7 +364,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	 * by _counting_ BCLKs. Calculate frame size in BCLKs */
 	master = mcbsp->fmt & SND_SOC_DAIFMT_MASTER_MASK;
 	if (master ==	SND_SOC_DAIFMT_CBS_CFS) {
-		printk(KERN_ERR "This McBSP is master\n");
+		printk(KERN_ERR "This McBSP (%i) is master\n", mcbsp->id);
 		printk(KERN_ERR "mcbsp->clk_div: %d \n",mcbsp->clk_div);
 		div = mcbsp->clk_div ? mcbsp->clk_div : 1;
 		printk(KERN_ERR "mcbsp params_rate: %d\n", params_rate(params));
@@ -379,17 +395,17 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	case SND_SOC_DAIFMT_LEFT_J:
 		regs->srgr2	|= FPER(framesize - 1);
 		regs->srgr1	|= FWID((framesize >> 1) - 1);
-		printk(KERN_ERR "mcbsp daifmt I2S or LeftJusty\n");
+		printk(KERN_ERR "(%i) mcbsp daifmt I2S or LeftJusty\n", mcbsp->id);
 		break;
 	case SND_SOC_DAIFMT_DSP_A:
 	case SND_SOC_DAIFMT_DSP_B:
 		regs->srgr2	|= FPER(framesize - 1);
 		regs->srgr1	|= FWID(0);
-		printk(KERN_ERR "mcbsp daifmt DSP A or B\n");
+		printk(KERN_ERR "(%i) mcbsp daifmt DSP A or B\n", mcbsp->id);
 		break;
 	}
 
-	x_omap_mcbsp_config(mcbsp, &mcbsp->cfg_regs);
+	omap_mcbsp_config(mcbsp->id, &mcbsp->cfg_regs);
 	mcbsp->wlen = wlen;
 	mcbsp->configured = 1;
 
@@ -407,7 +423,7 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 	struct omap_mcbsp_reg_cfg *regs = &mcbsp->cfg_regs;
 	bool inv_fs = false;
 
-	printk(KERN_ERR "mcbsp dai set dai fmt\n");
+	printk(KERN_ERR "(%i) mcbsp dai set dai fmt\n", mcbsp->id);
 
 	if (mcbsp->configured)
 		return 0;
@@ -444,7 +460,7 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 		/* 1-bit data delay */
 		regs->rcr2	|= RDATDLY(1);
 		regs->xcr2	|= XDATDLY(1);
-			printk(KERN_ERR "mcbsp dai set dai fmt i2s\n");
+			printk(KERN_ERR "mcbsp %i dai set dai fmt i2s\n", mcbsp->id);
 
 		break;
 	case SND_SOC_DAIFMT_LEFT_J:
@@ -489,19 +505,19 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 				   CLKXM | CLKRM;
 		/* Sample rate generator drives the FS */
 		regs->srgr2	|= FSGM;
-			printk(KERN_ERR "mcbsp dai set dai fmt is master (CBS_CFS)\n");
+			printk(KERN_ERR "mcbsp %i dai set dai fmt is master (CBS_CFS)\n", mcbsp->id);
 
 		break;
 	case SND_SOC_DAIFMT_CBM_CFS:
 		/* McBSP slave. FS clock as output */
 		regs->srgr2	|= FSGM;
 		regs->pcr0	|= FSXM | FSRM;
-			printk(KERN_ERR "mcbsp dai set dai fmt mcbsp slave/master (CBM_CFS) \n");
+			printk(KERN_ERR "mcbsp %i dai set dai fmt mcbsp slave/master (CBM_CFS) \n", mcbsp->id);
 
 		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* McBSP slave */
-			printk(KERN_ERR "mcbsp dai set dai fmt slave CBM CFM\n");
+			printk(KERN_ERR "mcbsp %i dai set dai fmt slave CBM CFM\n", mcbsp->id);
 		break;
 	default:
 		/* Unsupported master/slave configuration */
@@ -564,7 +580,7 @@ printk(KERN_ERR "mcbsp dai set clockdiv end\n");
 
 #define MCBSP_CLKS_PAD_SRC	0x000f
 #define MCBSP_CLKS_PRCM_SRC	0x00f0
-static omap2_mcbsp_set_clks_src(struct x_omap_mcbsp *mcbsp, u8 fck_src_id)
+static int omap2_mcbsp_set_clks_src(struct x_omap_mcbsp *mcbsp, u8 fck_src_id)
 {
         struct clk *fck_src;
         const char *src;
@@ -576,7 +592,7 @@ static omap2_mcbsp_set_clks_src(struct x_omap_mcbsp *mcbsp, u8 fck_src_id)
                 src = "prcm_fck";
         else   
                 return -EINVAL;
-
+#if 0
         fck_src = clk_get(mcbsp->dev, src);
         if (IS_ERR(fck_src)) {
                 dev_err(mcbsp->dev, "CLKS: could not clk_get() %s\n", src);
@@ -596,7 +612,7 @@ static omap2_mcbsp_set_clks_src(struct x_omap_mcbsp *mcbsp, u8 fck_src_id)
         pm_runtime_get_sync(mcbsp->dev);
 
         clk_put(fck_src);
-
+#endif
         return 0;
 
 }
@@ -609,7 +625,7 @@ static int omap_mcbsp_dai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 	struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 	struct omap_mcbsp_reg_cfg *regs = &mcbsp->cfg_regs;
 	int err = 0;
-printk(KERN_ERR "mcbsp dai set sysclk\n");
+printk(KERN_ERR "mcbsp %i dai set sysclk\n", mcbsp->id);
 	if (mcbsp->active) {
 		if (freq == mcbsp->in_freq) {
 			printk(KERN_ERR "mcbsp dai set sysclk happy\n");
@@ -631,6 +647,8 @@ printk(KERN_ERR "mcbsp dai set sysclk\n");
 		printk(KERN_ERR "mcbsp dai set sysclk %d clk sm \n", clk_id);
 		break;
 	case OMAP_MCBSP_SYSCLK_CLKS_FCLK:
+#if 0
+		/* HY-DBG hack to force external clock */
 		if (mcbsp_omap1()) {
 			err = -EINVAL;
 			printk(KERN_ERR "mcbsp dai set sysclk %d clk sm is sad\n", clk_id);
@@ -640,6 +658,7 @@ printk(KERN_ERR "mcbsp dai set sysclk\n");
 					       MCBSP_CLKS_PRCM_SRC);
 	       printk(KERN_ERR "mcbsp dai set sysclk %d clk fclk \n", clk_id);
 		break;
+#endif
 	case OMAP_MCBSP_SYSCLK_CLKS_EXT:
 		if (mcbsp_omap1()) {
 			err = 0;
@@ -693,6 +712,7 @@ static int omap_mcbsp_probe(struct snd_soc_dai *dai)
 {
 	struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(dai);
 
+	printk(KERN_ERR "%s: mcbsp->id = %i\n", __func__, mcbsp->id);
 	pm_runtime_enable(mcbsp->dev);
 	snd_soc_dai_init_dma_data(dai,
 				  &mcbsp->dma_data[SNDRV_PCM_STREAM_PLAYBACK],
@@ -912,6 +932,8 @@ static int asoc_mcbsp_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 #endif
 	int ret;
+/* 	printk("HY-DBG: Aborting early...\n"); */
+	/* HY-DBG */ /* return -ENOMEM; */
 #if 0
 	match = of_match_device(omap_mcbsp_of_match, &pdev->dev);
 	if (match) {
@@ -941,11 +963,12 @@ static int asoc_mcbsp_probe(struct platform_device *pdev)
 	mcbsp->pdata = pdata;
 	mcbsp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, mcbsp);
-
+	printk("HY-DBG: probing id = %i\n", pdev->id);
+#if 0
 	ret = x_omap_mcbsp_init(pdev);
 	if (ret)
 		return ret;
-
+#endif
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					      &omap_mcbsp_component,
 					      &omap_mcbsp_dai, 1);
@@ -962,16 +985,21 @@ static int asoc_mcbsp_remove(struct platform_device *pdev)
 	if (mcbsp->pdata->ops && mcbsp->pdata->ops->free)
 		mcbsp->pdata->ops->free(mcbsp->id);
 
+#if 0
 	x_omap_mcbsp_sysfs_remove(mcbsp);
-
+#else
+	printk("HY-DBG: remove broken, please fix\n");
+#endif
+#if 0
 	clk_put(mcbsp->fclk);
+#endif
 
 	return 0;
 }
 
 static struct platform_driver asoc_mcbsp_driver = {
 	.driver = {
-			.name = "omap-mcbsp",
+			.name = "new-omap-mcbsp",
 #if 0
 			.of_match_table = omap_mcbsp_of_match,
 #endif
@@ -981,9 +1009,25 @@ static struct platform_driver asoc_mcbsp_driver = {
 	.remove = asoc_mcbsp_remove,
 };
 
+#if 0
 module_platform_driver(asoc_mcbsp_driver);
+#else
+static int __init asoc_mcbsp_init(void)
+{
+	printk("HY-DBG: in init\n");
+	return platform_driver_register(&asoc_mcbsp_driver);
+}
+
+static void __exit asoc_mcbsp_exit(void)
+{
+	return platform_driver_unregister(&asoc_mcbsp_driver);
+}
+
+module_init(asoc_mcbsp_init);
+module_exit(asoc_mcbsp_exit);
+#endif
 
 MODULE_AUTHOR("Jarkko Nikula <jarkko.nikula@bitmer.com>");
 MODULE_DESCRIPTION("OMAP I2S SoC Interface");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:omap-mcbsp");
+MODULE_ALIAS("platform:new-omap-mcbsp");

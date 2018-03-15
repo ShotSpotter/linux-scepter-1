@@ -440,6 +440,8 @@ EXPORT_SYMBOL(omap_set_dma_src_params);
 
 void omap_set_dma_params(int lch, struct omap_dma_channel_params *params)
 {
+	printk("HY-DBG:%s:%i - DMA src %p dest %p\n", __func__, __LINE__, 
+		params->src_start, params->dst_start);
 	omap_set_dma_transfer_params(lch, params->data_type,
 				     params->elem_count, params->frame_count,
 				     params->sync_mode, params->trigger,

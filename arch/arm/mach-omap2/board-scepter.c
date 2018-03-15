@@ -509,25 +509,30 @@ static struct platform_device scepter_wm8737_sync = {
 /* ------------- HY-DBG --------------- */
 static struct asoc_simple_card_info scepter_master = {
 	.name = "wm8737master0",
-	.codec = "wm8737",
+	.codec = "wm8737.2-001a",
 	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_NB_NF,
+	.platform = "new-omap-mcbsp.0",
 	.cpu_dai = {
-		.name = "omap-mcbsp-0",
+		.name = "new-omap-mcbsp.0",
+		.sysclk = 12288000,
 	},
 	.codec_dai = {
-		.name = "wm8737-0",
+		.name = "wm8737",
 		.sysclk = 12288000,
 	},
 };
 static struct asoc_simple_card_info scepter_slave = {
 	.name = "wm8737slave0",
-	.codec = "wm8737",
-	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS | SND_SOC_DAIFMT_NB_NF,
+	.codec = "wm8737.2-001b",
+	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_NB_NF,
+	.platform = "new-omap-mcbsp.1",
 	.cpu_dai = {
-		.name = "omap-mcbsp-1",
+		.name = "new-omap-mcbsp.1",
+		.sysclk = 12288000,
 	},
 	.codec_dai = {
-		.name = "wm8737-1",
+		.name = "wm8737",
+		.sysclk = 12288000,
 	},
 };
 static struct omap_mcbsp_platform_data scepter_mcbsp1 = {
@@ -536,25 +541,25 @@ static struct omap_mcbsp_platform_data scepter_mcbsp1 = {
 	.buffer_size = 128,
 };
 static struct platform_device snd_slave = {
-	.name	= "simple-audio-card",
-	.id	= -1,
-	.dev	= {
-		.platform_data	= &scepter_master,
-	},
-}, snd_master = {
-	.name	= "simple-audio-card",
-	.id	= -1,
+	.name	= "asoc-simple-card",
+	.id	= 0,
 	.dev	= {
 		.platform_data	= &scepter_slave,
 	},
+}, snd_master = {
+	.name	= "asoc-simple-card",
+	.id	= 1,
+	.dev	= {
+		.platform_data	= &scepter_master,
+	},
 }, snd_mcbsp1 = {
-	.name 	= "omap-mcbsp",
+	.name 	= "new-omap-mcbsp",
 	.id	= 0,
 	.dev	= {
 		.platform_data = &scepter_mcbsp1
 	},
 }, snd_mcbsp2 = {
-	.name 	= "omap-mcbsp",
+	.name 	= "new-omap-mcbsp",
 	.id	= 1,
 	.dev	= {
 		.platform_data = &scepter_mcbsp2,
@@ -635,17 +640,22 @@ static struct omap_board_config_kernel scepter_config[] __initdata = {
 static struct platform_device *scepter_devices[] __initdata = {
 	&leds_gpio,
 #if 0
+	/* old */
 	&scepter_wm8737_sync,
 #endif
 	&generic_soc_slave,
+	&snd_mcbsp1,
+	&snd_mcbsp2,
 	&scepter_wm8737_dvdd_device,
 	&scepter_wm8737_avdd_mvdd_device,
 	&scepter_wm8737_micbias_device[0],
 	&scepter_wm8737_micbias_device[1],
+};
+static struct platform_device *scepter_devices_later[] __initdata = {
 	&snd_master,
+#if 0
 	&snd_slave,
-	&snd_mcbsp1,
-	&snd_mcbsp2,
+#endif
 };
 
 static void __init scepter_init_irq(void)
@@ -862,6 +872,9 @@ static void __init scepter_init(void)
       printk(KERN_NOTICE "No mmc detected.");
       omap2_hsmmc_init(mmc_no_if_brd);
     }
+    printk(KERN_NOTICE "scpeter_devices_later");
+	platform_add_devices(scepter_devices_later,
+				ARRAY_SIZE(scepter_devices_later));
     printk(KERN_NOTICE "scepter init complete.");
 }
 

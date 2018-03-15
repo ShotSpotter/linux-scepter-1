@@ -651,8 +651,21 @@ static struct platform_driver asoc_simple_card = {
 	.probe = asoc_simple_card_probe,
 	.remove = asoc_simple_card_remove,
 };
+#if 1
+static int __init asoc_simple_card_init(void)
+{
+	return platform_driver_register(&asoc_simple_card);
+}
 
+static void __exit asoc_simple_card_exit(void)
+{
+	return platform_driver_unregister(&asoc_simple_card);
+}
+late_initcall(asoc_simple_card_init);
+module_exit(asoc_simple_card_exit);
+#else
 module_platform_driver(asoc_simple_card);
+#endif
 
 MODULE_ALIAS("platform:asoc-simple-card");
 MODULE_LICENSE("GPL");

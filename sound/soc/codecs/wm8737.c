@@ -440,17 +440,22 @@ static int wm8737_set_dai_fmt(struct snd_soc_dai *codec_dai,
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
+		printk(KERN_ERR "FMT I2S\n");
 		af |= 0x2;
 		break;
 	case SND_SOC_DAIFMT_RIGHT_J:
+		printk(KERN_ERR "FMT RightJ\n");
 		break;
 	case SND_SOC_DAIFMT_LEFT_J:
+		printk(KERN_ERR "FMT LeftJ\n");
 		af |= 0x1;
 		break;
 	case SND_SOC_DAIFMT_DSP_A:
+		printk(KERN_ERR "FMT DSPA\n");
 		af |= 0x3;
 		break;
 	case SND_SOC_DAIFMT_DSP_B:
+		printk(KERN_ERR "FMT DSPB\n");
 		af |= 0x13;
 		break;
 	default:

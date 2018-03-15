@@ -32,6 +32,8 @@
 #include <plat/dma.h>
 #include "omap-pcm.h"
 
+#include "mcbsp.h"
+
 static const struct snd_pcm_hardware omap_pcm_hardware = {
 	.info			= SNDRV_PCM_INFO_MMAP |
 				  SNDRV_PCM_INFO_MMAP_VALID |
@@ -104,6 +106,9 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct omap_pcm_dma_data *dma_data;
 	int err = 0;
 
+        struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+        struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
+
 	dma_data = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
 
 	/* return if this is a bufferless transfer e.g.
@@ -117,6 +122,19 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
 	if (prtd->dma_data)
 		return 0;
 	prtd->dma_data = dma_data;
+/* Nasty HACK -- HY-DBG -- */
+        if (mcbsp->id == 0) {
+                /* dma_data->port_addr = 0x48074000+(substream->stream)?DXR:DRR; */
+                /* dma_data->dma_req = (substream->stream)?OMAP24XX_DMA_MCBSP1_TX:OMAP24XX_DMA_MCBSP1_RX+; */
+                dma_data->port_addr = 0x48074000+((substream->stream)?0x08:0x00);
+                dma_data->dma_req = (substream->stream)?8:9;
+        } else if (mcbsp->id == 1) {
+                dma_data->port_addr = 0x49022000+((substream->stream)?0x08:0x00);
+                dma_data->dma_req = (substream->stream)?16:17;
+        } else {
+                printk("HY-DBG: NASTY HACK FAILED!!!\n");
+        }
+/* End Nasty HACK -- HY-DBG -- */
 	err = omap_request_dma(dma_data->dma_req, dma_data->name,
 			       omap_pcm_dma_irq, substream, &prtd->dma_ch);
 	if (!err) {
@@ -155,12 +173,33 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 	struct omap_dma_channel_params dma_params;
 	int bytes;
 
+        struct snd_soc_pcm_runtime *rtd = substream->private_data;
+        struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+        struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
+
 	/* return if this is a bufferless transfer e.g.
 	 * codec <--> BT codec or GSM modem -- lg FIXME */
 	if (!prtd->dma_data)
 		return 0;
 
 	memset(&dma_params, 0, sizeof(dma_params));
+/* Nasty HACK -- HY-DBG -- */
+        if (mcbsp->id == 0) {
+                /* dma_data->port_addr = 0x48074000+(substream->stream)?DXR:DRR; */
+                /* dma_data->dma_req = (substream->stream)?OMAP24XX_DMA_MCBSP1_TX:OMAP24XX_DMA_MCBSP1_RX+; */
+                dma_data->port_addr = 0x48074000+((substream->stream)?0x08:0x00);
+                dma_data->dma_req = (substream->stream)?8:9;
+        } else if (mcbsp->id == 1) {
+                dma_data->port_addr = 0x49022000+((substream->stream)?0x08:0x00);
+                dma_data->dma_req = (substream->stream)?16:17;
+        } else {
+                printk("HY-DBG: NASTY HACK FAILED!!!\n");
+        }
+	/* dma_data->data_type = OMAP_DMA_DATA_TYPE_S16; */
+	dma_data->data_type = 0x01;
+	dma_data->sync_mode = 0x03; /* Frame */
+/* End Nasty HACK -- HY-DBG -- */
+
 	dma_params.data_type			= dma_data->data_type;
 	dma_params.trigger			= dma_data->dma_req;
 	dma_params.sync_mode			= dma_data->sync_mode;
@@ -364,11 +403,23 @@ static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
 		buf->area = NULL;
 	}
 }
-
+#if 0
 static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 		 struct snd_pcm *pcm)
+#else
+static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
+#endif
 {
+	struct snd_card *card = rtd->card->snd_card;
+	struct snd_pcm *pcm = rtd->pcm;
+
 	int ret = 0;
+
+	printk("HY-DBG: %p %p %p\n", pcm,
+		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_PLAYBACK]):NULL,
+		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_CAPTURE]):NULL);
+
+	printk("HY-DBG 2 : %p %p\n", card, (card != NULL)?card->dev:NULL);
 
 	if (!card->dev->dma_mask)
 		card->dev->dma_mask = &omap_pcm_dmamask;
@@ -390,7 +441,11 @@ static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 			goto out;
 	}
 #else
+	printk("HY-DBG 3 : %p %p %p\n", pcm,
+		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_PLAYBACK]):NULL,
+		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_CAPTURE]):NULL);
 	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
+		printk("HY-DBG: PLAYBACK CASE\n");
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_PLAYBACK);
 		if (ret)
@@ -398,6 +453,7 @@ static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 	}
 
 	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
+		printk("HY-DBG: CAPTURE CASE\n");
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_CAPTURE);
 		if (ret)
@@ -418,15 +474,17 @@ struct snd_soc_platform_driver omap_soc_platform = {
 };
 EXPORT_SYMBOL_GPL(omap_soc_platform);
 
-int omap_soc_platform_register(struct device *dev)
+int omap_pcm_platform_register(struct device *dev)
 {
 	return devm_snd_soc_register_platform(dev, &omap_soc_platform);
 }
 EXPORT_SYMBOL_GPL(omap_pcm_platform_register);
 
-#if 0
+static int __init omap_soc_platform_init(void)
+{
+}
+
 module_init(omap_soc_platform_init);
-#endif
 static void __exit omap_soc_platform_exit(void)
 {
 	snd_soc_unregister_platform(&omap_soc_platform);

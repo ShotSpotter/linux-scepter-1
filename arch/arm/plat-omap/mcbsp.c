@@ -866,9 +866,6 @@ int omap_mcbsp_request(unsigned int id)
 		return -ENOMEM;
 	}
 
-	printk("HY-DBG: %s:%i MCBSP id %i @ %08x(%08x)\n", __func__, __LINE__,
-		id, mcbsp->io_base, mcbsp->phys_base);
-
 	spin_lock(&mcbsp->lock);
 	if (!mcbsp->free) {
 		dev_err(mcbsp->dev, "McBSP%d is currently in use\n",

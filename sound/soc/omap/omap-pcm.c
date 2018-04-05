@@ -126,10 +126,10 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
         if (mcbsp->id == 0) {
                 /* dma_data->port_addr = 0x48074000+(substream->stream)?DXR:DRR; */
                 /* dma_data->dma_req = (substream->stream)?OMAP24XX_DMA_MCBSP1_TX:OMAP24XX_DMA_MCBSP1_RX+; */
-                dma_data->port_addr = 0x48074000+((substream->stream)?0x08:0x00);
-                dma_data->dma_req = (substream->stream)?8:9;
+                dma_data->port_addr = 0x48074000+((substream->stream)?0x00:0x08);
+                dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
-                dma_data->port_addr = 0x49022000+((substream->stream)?0x08:0x00);
+                dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
                 dma_data->dma_req = (substream->stream)?16:17;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
@@ -187,10 +187,10 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
         if (mcbsp->id == 0) {
                 /* dma_data->port_addr = 0x48074000+(substream->stream)?DXR:DRR; */
                 /* dma_data->dma_req = (substream->stream)?OMAP24XX_DMA_MCBSP1_TX:OMAP24XX_DMA_MCBSP1_RX+; */
-                dma_data->port_addr = 0x48074000+((substream->stream)?0x08:0x00);
-                dma_data->dma_req = (substream->stream)?8:9;
+                dma_data->port_addr = 0x48074000+((substream->stream)?0x00:0x08);
+                dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
-                dma_data->port_addr = 0x49022000+((substream->stream)?0x08:0x00);
+                dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
                 dma_data->dma_req = (substream->stream)?16:17;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");

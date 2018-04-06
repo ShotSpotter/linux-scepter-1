@@ -164,6 +164,8 @@ static int omap_pcm_hw_free(struct snd_pcm_substream *substream)
 
 	return 0;
 }
+extern int hack_sync_mode[2];
+extern int hack_data_type[2];
 
 static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 {
@@ -196,8 +198,13 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
 	/* dma_data->data_type = OMAP_DMA_DATA_TYPE_S16; */
+#if 0
 	dma_data->data_type = 0x01;
-	dma_data->sync_mode = 0x03; /* Frame */
+	dma_data->sync_mode = 0x01; 
+#else
+	dma_data->sync_mode = hack_sync_mode[mcbsp->id];
+	dma_data->data_type = hack_data_type[mcbsp->id];
+#endif
 /* End Nasty HACK -- HY-DBG -- */
 
 	dma_params.data_type			= dma_data->data_type;

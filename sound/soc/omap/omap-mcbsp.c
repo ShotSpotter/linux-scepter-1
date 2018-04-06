@@ -69,6 +69,11 @@ enum {
 	OMAP_MCBSP_WORD_32,
 };
 #endif
+
+/* HACK */
+int hack_sync_mode[2];
+int hack_data_type[2];
+/* END HACK */
 void x_omap_mcbsp_set_tx_threshold(struct x_omap_mcbsp *mcbsp, u16 words)
 {
 	omap_mcbsp_set_tx_threshold(mcbsp->id, words);
@@ -261,16 +266,63 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		wlen = 16;
+		/* hack_data_type[mcbsp->id] = OMAP_DMA_DATA_TYPE_S16; */
+		hack_data_type[mcbsp->id] = 0x01;
 		printk(KERN_ERR "mcbsp %i hwparams s16le\n", mcbsp->id);
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		wlen = 32;
 		printk(KERN_ERR "mcbsp %i hwparams s32le\n", mcbsp->id);
+		/* hack_data_type[mcbsp->id] = OMAP_DMA_DATA_TYPE_S32; */
+		hack_data_type[mcbsp->id] =0x02;
 		break;
 	default:
 	printk(KERN_ERR "mcbsp %i hwparams no format for you\n", mcbsp->id);
 		return -EINVAL;
 	}
+	/* HY-DBG - Nasty HACK */
+	{
+		int period_words, max_thrsh;
+
+		period_words = params_period_bytes(params)/(wlen/8);
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			max_thrsh = omap_mcbsp_get_max_tx_threshold(mcbsp->id);
+		else
+			max_thrsh = omap_mcbsp_get_max_rx_threshold(mcbsp->id);
+	 	/*
+		 * If the period contains less or equal number of words,
+		 * we are using the original threshold mode setup:
+		 * McBSP threshold = sDMA frame size = period_size
+		 * Otherwise we switch to sDMA packet mode:
+		 * McBSP threshold = sDMA packet size
+		 * sDMA frame size = period size
+		 */
+		if (period_words > max_thrsh) {
+			int divider = 0;
+
+			/*
+			 * Look for the biggest threshold value, which
+			 * divides the period size evenly.
+			 */
+			divider = period_words / max_thrsh;
+			if (period_words % max_thrsh)
+				divider++;
+			while (period_words % divider &&
+				divider < period_words)
+				divider++;
+			if (divider == period_words)
+                                        return -EINVAL;
+
+			pkt_size = period_words / divider;
+			/* hack_sync_mode[mcbsp->id] = OMAP_DMA_SYNC_PACKET; */
+			hack_sync_mode[mcbsp->id] = 3;
+			
+		} else {
+			/* hack_sync_mode[mcbsp->id] = OMAP_DMA_SYNC_FRAME; */
+			hack_sync_mode[mcbsp->id] = 1;
+		}
+	}
+	/* End HY-DBG - Nasty HACK */
 	if (mcbsp->pdata->buffer_size) {
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
 			int period_words, max_thrsh;

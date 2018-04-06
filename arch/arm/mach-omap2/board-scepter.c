@@ -524,7 +524,7 @@ static struct asoc_simple_card_info scepter_master = {
 static struct asoc_simple_card_info scepter_slave = {
 	.name = "wm8737slave0",
 	.codec = "wm8737.2-001b",
-	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_NB_NF,
+	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS | SND_SOC_DAIFMT_NB_NF,
 	.platform = "new-omap-mcbsp.1",
 	.cpu_dai = {
 		.name = "new-omap-mcbsp.1",
@@ -653,9 +653,7 @@ static struct platform_device *scepter_devices[] __initdata = {
 };
 static struct platform_device *scepter_devices_later[] __initdata = {
 	&snd_master,
-#if 0
 	&snd_slave,
-#endif
 };
 
 static void __init scepter_init_irq(void)

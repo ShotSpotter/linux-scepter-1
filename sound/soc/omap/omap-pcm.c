@@ -164,7 +164,9 @@ static int omap_pcm_hw_free(struct snd_pcm_substream *substream)
 
 	return 0;
 }
-
+extern int hack_sync_mode[4];
+extern int hack_dma_data[4];
+extern int hack_pkt_size[4];
 static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -196,8 +198,12 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
 	/* dma_data->data_type = OMAP_DMA_DATA_TYPE_S16; */
-	dma_data->data_type = 0x01;
-	dma_data->sync_mode = 0x03; /* Frame */
+	dma_data->data_type = hack_dma_data[mcbsp->id];	/* S16 */
+#if 0
+	dma_data->sync_mode = 0x01; /* Frame */
+#else
+	dma_data->sync_mode = hack_sync_mode[mcbsp->id];
+#endif
 /* End Nasty HACK -- HY-DBG -- */
 
 	dma_params.data_type			= dma_data->data_type;
@@ -210,7 +216,11 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 		dma_params.src_start		= runtime->dma_addr;
 		dma_params.dst_start		= dma_data->port_addr;
 		dma_params.dst_port		= OMAP_DMA_PORT_MPUI;
+#if 0
 		dma_params.dst_fi		= dma_data->packet_size;
+#else
+		dma_params.dst_fi		= hack_pkt_size[mcbsp->id];
+#endif
 	} else {
 		dma_params.src_amode		= OMAP_DMA_AMODE_CONSTANT;
 		dma_params.dst_amode		= OMAP_DMA_AMODE_POST_INC;
@@ -218,7 +228,11 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 		dma_params.src_start		= dma_data->port_addr;
 		dma_params.dst_start		= runtime->dma_addr;
 		dma_params.src_port		= OMAP_DMA_PORT_MPUI;
+#if 0
 		dma_params.src_fi		= dma_data->packet_size;
+#else
+		dma_params.src_fi		= hack_pkt_size[mcbsp->id];
+#endif
 	}
 	/*
 	 * Set DMA transfer frame size equal to ALSA period size and frame
@@ -247,6 +261,8 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+void hack_omap_mcbsp_set_threshold(struct snd_pcm_substream *substream);
+
 static int omap_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -262,8 +278,12 @@ static int omap_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		prtd->period_index = 0;
 		/* Configure McBSP internal buffer usage */
+#if 1
 		if (dma_data->set_threshold)
 			dma_data->set_threshold(substream);
+#else
+		hack_omap_mcbsp_set_threshold(substream);
+#endif
 
 		omap_start_dma(prtd->dma_ch);
 		break;

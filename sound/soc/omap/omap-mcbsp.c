@@ -77,6 +77,10 @@ void x_omap_mcbsp_set_rx_threshold(struct x_omap_mcbsp *mcbsp, u16 words)
 {
 	omap_mcbsp_set_rx_threshold(mcbsp->id, words);
 }
+
+int hack_sync_mode[4];
+int hack_dma_data[4];
+int hack_pkt_size[4];
 /*
  * Stream DMA parameters. DMA request line and port address are set runtime
  * since they are different between OMAP1 and later OMAPs
@@ -89,15 +93,20 @@ static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream,
 	struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 	int words;
 
-	/*
-	 * Configure McBSP threshold based on either:
-	 * packet_size, when the sDMA is in packet mode, or based on the
-	 * period size in THRESHOLD mode, otherwise use McBSP threshold = 1
-	 * for mono streams.
-	 */
-	if (packet_size)
-		words = packet_size;
-	else
+	if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
+
+		/*
+		 * Configure McBSP threshold based on either:
+		 * packet_size, when the sDMA is in packet mode, or based on the
+		 * period size in THRESHOLD mode, otherwise use McBSP threshold = 1
+		 * for mono streams.
+		 */
+		if (packet_size)
+			words = packet_size;
+		else
+			words = snd_pcm_lib_period_bytes(substream) /
+                                                   (mcbsp->wlen / 8);
+	} else 
 		words = 1;
 
 	/* Configure McBSP internal buffer usage */
@@ -105,6 +114,14 @@ static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream,
 		x_omap_mcbsp_set_tx_threshold(mcbsp, words);
 	else
 		x_omap_mcbsp_set_rx_threshold(mcbsp, words);
+}
+void hack_omap_mcbsp_set_threshold(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct x_omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
+
+	omap_mcbsp_set_threshold(substream, hack_pkt_size[mcbsp->id]);
 }
 
 static int omap_mcbsp_hwrule_min_buffersize(struct snd_pcm_hw_params *params,
@@ -241,7 +258,6 @@ static snd_pcm_sframes_t omap_mcbsp_dai_delay(
 
 	return delay;
 }
-
 static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_pcm_hw_params *params,
 				    struct snd_soc_dai *cpu_dai)
@@ -261,10 +277,12 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		wlen = 16;
+		hack_dma_data[mcbsp->id] = 0x01;
 		printk(KERN_ERR "mcbsp %i hwparams s16le\n", mcbsp->id);
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		wlen = 32;
+		hack_dma_data[mcbsp->id] = 0x02;
 		printk(KERN_ERR "mcbsp %i hwparams s32le\n", mcbsp->id);
 		break;
 	default:
@@ -288,20 +306,28 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 			 * Look for the biggest threshold value which divides
 			 * the period size evenly.
 			 */
-			divider = period_words / max_thrsh;
-			if (period_words % max_thrsh)
-				divider++;
-			while (period_words % divider &&
-				divider < period_words)
-				divider++;
-			if (divider == period_words)
-				return -EINVAL;
+			if (period_words > max_thrsh) {
+				int divider = 0;
 
-			pkt_size = period_words / divider;
-		} else if (channels > 1) {
-			/* Use packet mode for non mono streams */
-			pkt_size = channels;
-		}
+				divider = period_words / max_thrsh;
+				if (period_words % max_thrsh)
+					divider++;
+				while (period_words % divider &&
+					divider < period_words)
+					divider++;
+				if (divider == period_words)
+					return -EINVAL;
+
+				pkt_size = period_words / divider;
+				/* hack_sync_mode = OMAP_DMA_SYNC_PACKET; */
+				hack_sync_mode[mcbsp->id] = 0x03;
+			} else {
+				/* hack_sync_mode = OMAP_DMA_SYNC_FRAME; */
+				hack_sync_mode[mcbsp->id] = 0x01;
+			}
+
+		} 
+		hack_pkt_size[mcbsp->id] = pkt_size;
 		omap_mcbsp_set_threshold(substream, pkt_size);
 	}
 	dma_data->maxburst = pkt_size;

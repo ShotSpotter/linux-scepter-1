@@ -289,10 +289,6 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	printk(KERN_ERR "mcbsp %i hwparams no format for you\n", mcbsp->id);
 		return -EINVAL;
 	}
-	/* Nasty HACK */
-	{
-		
-	}
 	if (mcbsp->pdata->buffer_size) {
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
 			int period_words, max_thrsh;

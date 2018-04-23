@@ -47,10 +47,6 @@
 #include <sound/simple_card.h>
 
 #include <sound/wm8737.h>
-#if 0
-#include <plat/wm8737-sync.h>
-#include <sound/soc-dai.h>
-#endif
 #include <linux/regulator/machine.h>
 #include <linux/regulator/wm8737-micbias-regulator.h>
 #include <linux/regulator/fixed.h>
@@ -373,10 +369,6 @@ static struct regulator_consumer_supply scepter_wm8737_avdd_mvdd_supplies[] = {
 };
 
 static struct regulator_init_data wm8737_avdd_mvdd_initdata = {
-#if 0
-	/*supply_regulator_dev is the correct relationship but it is broken.*/
-	.supply_regulator_dev = &scepter_wm8737_dvdd_device.dev,
-#endif
 	.consumer_supplies = scepter_wm8737_avdd_mvdd_supplies,
 	.num_consumer_supplies = ARRAY_SIZE(scepter_wm8737_avdd_mvdd_supplies),
 	.constraints = {
@@ -406,10 +398,6 @@ static struct regulator_consumer_supply scepter_wm8737_micbias_supply[] = {
 
 static struct regulator_init_data wm8737_micbias_initdata[] = {
 		{
-#if 0
-				/*supply_regulator_dev is the correct relationship but it is broken.*/
-				.supply_regulator_dev = &scepter_wm8737_avdd_mvdd_device.dev,
-#endif
 				.consumer_supplies = &scepter_wm8737_micbias_supply[0],
 				.num_consumer_supplies = 1,
 				.constraints = {
@@ -418,9 +406,6 @@ static struct regulator_init_data wm8737_micbias_initdata[] = {
 				},
 		},
 		{
-#if 0
-				.supply_regulator_dev = &scepter_wm8737_avdd_mvdd_device.dev,
-#endif
 				.consumer_supplies = &scepter_wm8737_micbias_supply[1],
 				.num_consumer_supplies = 1,
 				.constraints = {
@@ -461,52 +446,6 @@ static struct platform_device scepter_wm8737_micbias_device[] = {
 		},
 };
 
-#if 0
-static struct wm8737_platform_data scepter_wm8737_data[] = {
-		{
-				.id = 0,
-		},
-		{
-				.id = 1,
-		}
-};
-static struct wm8737_omap_data scepter_wm8737_master =
-{
-		.wm8737_id = 0,
-		.mcbsp_id = 0,
-		.codec_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
-		.cpu_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
-};
-
-static struct wm8737_omap_data scepter_wm8737_slaves[] =
-{
-		{
-				.wm8737_id = 1,
-				.mcbsp_id = 1,
-				.codec_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
-				.cpu_dai_audio_fmt = SND_SOC_DAIFMT_I2S,
-		}
-};
-
-static struct wm8737_sync_platform_data scepter_wm8737_sync_data = {
-		.sample_cnt_rst_gpio = 84,
-		.mclk_en_gpio = 106,
-		.mclk = 12288000,
-		.master = &scepter_wm8737_master,
-		.slaves = scepter_wm8737_slaves,
-		.num_slaves = ARRAY_SIZE(scepter_wm8737_slaves),
-};
-
-static struct platform_device scepter_wm8737_sync = {
-		.name = "wm8737-sync",
-		.id = -2,
-		.dev = {
-			.platform_data = &scepter_wm8737_sync_data,
-		},
-};
-#endif
-
-/* ------------- HY-DBG --------------- */
 static struct asoc_simple_card_info scepter_master = {
 	.name = "wm8737master0",
 	.codec = "wm8737.2-001a",
@@ -524,7 +463,7 @@ static struct asoc_simple_card_info scepter_master = {
 static struct asoc_simple_card_info scepter_slave = {
 	.name = "wm8737slave0",
 	.codec = "wm8737.2-001b",
-	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_NB_NF,
+	.daifmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS | SND_SOC_DAIFMT_NB_NF,
 	.platform = "new-omap-mcbsp.1",
 	.cpu_dai = {
 		.name = "new-omap-mcbsp.1",
@@ -565,7 +504,6 @@ static struct platform_device snd_slave = {
 		.platform_data = &scepter_mcbsp2,
 	},
 };
-/* ------------- HY-DBG --------------- */
 static struct platform_device generic_soc_slave = {
 		.name = "asoc-slave-codec",
 		.id = -1,
@@ -602,15 +540,9 @@ static struct i2c_board_info __initdata scepter_i2c1_boardinfo[] = {
 static struct i2c_board_info __initdata scepter_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("wm8737",0x1A),
-#if 0
-		.platform_data = &(scepter_wm8737_data[0]),
-#endif
 	},
 	{
 		I2C_BOARD_INFO("wm8737",0x1B),
-#if 0
-		.platform_data = &(scepter_wm8737_data[1]),
-#endif
 	}
 };
 
@@ -639,10 +571,6 @@ static struct omap_board_config_kernel scepter_config[] __initdata = {
 
 static struct platform_device *scepter_devices[] __initdata = {
 	&leds_gpio,
-#if 0
-	/* old */
-	&scepter_wm8737_sync,
-#endif
 	&generic_soc_slave,
 	&snd_mcbsp1,
 	&snd_mcbsp2,
@@ -653,9 +581,7 @@ static struct platform_device *scepter_devices[] __initdata = {
 };
 static struct platform_device *scepter_devices_later[] __initdata = {
 	&snd_master,
-#if 0
 	&snd_slave,
-#endif
 };
 
 static void __init scepter_init_irq(void)

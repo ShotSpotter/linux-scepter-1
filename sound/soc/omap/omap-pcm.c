@@ -130,7 +130,7 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
                 dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
                 dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
-                dma_data->dma_req = (substream->stream)?16:17;
+                dma_data->dma_req = (substream->stream)?34:33;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
@@ -193,17 +193,13 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
                 dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
                 dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
-                dma_data->dma_req = (substream->stream)?16:17;
+                dma_data->dma_req = (substream->stream)?34:33;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
 	/* dma_data->data_type = OMAP_DMA_DATA_TYPE_S16; */
 	dma_data->data_type = hack_dma_data[mcbsp->id];	/* S16 */
-#if 0
-	dma_data->sync_mode = 0x01; /* Frame */
-#else
 	dma_data->sync_mode = hack_sync_mode[mcbsp->id];
-#endif
 /* End Nasty HACK -- HY-DBG -- */
 
 	dma_params.data_type			= dma_data->data_type;
@@ -216,11 +212,7 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 		dma_params.src_start		= runtime->dma_addr;
 		dma_params.dst_start		= dma_data->port_addr;
 		dma_params.dst_port		= OMAP_DMA_PORT_MPUI;
-#if 0
-		dma_params.dst_fi		= dma_data->packet_size;
-#else
 		dma_params.dst_fi		= hack_pkt_size[mcbsp->id];
-#endif
 	} else {
 		dma_params.src_amode		= OMAP_DMA_AMODE_CONSTANT;
 		dma_params.dst_amode		= OMAP_DMA_AMODE_POST_INC;
@@ -228,11 +220,7 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
 		dma_params.src_start		= dma_data->port_addr;
 		dma_params.dst_start		= runtime->dma_addr;
 		dma_params.src_port		= OMAP_DMA_PORT_MPUI;
-#if 0
-		dma_params.src_fi		= dma_data->packet_size;
-#else
 		dma_params.src_fi		= hack_pkt_size[mcbsp->id];
-#endif
 	}
 	/*
 	 * Set DMA transfer frame size equal to ALSA period size and frame
@@ -423,49 +411,19 @@ static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
 		buf->area = NULL;
 	}
 }
-#if 0
-static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
-		 struct snd_pcm *pcm)
-#else
 static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
-#endif
 {
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
 
 	int ret = 0;
 
-	printk("HY-DBG: %p %p %p\n", pcm,
-		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_PLAYBACK]):NULL,
-		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_CAPTURE]):NULL);
-
-	printk("HY-DBG 2 : %p %p\n", card, (card != NULL)?card->dev:NULL);
-
 	if (!card->dev->dma_mask)
 		card->dev->dma_mask = &omap_pcm_dmamask;
 	if (!card->dev->coherent_dma_mask)
 		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
 
-#if 0
-	if (dai->playback.channels_min) {
-		ret = omap_pcm_preallocate_dma_buffer(pcm,
-			SNDRV_PCM_STREAM_PLAYBACK);
-		if (ret)
-			goto out;
-	}
-
-	if (dai->capture.channels_min) {
-		ret = omap_pcm_preallocate_dma_buffer(pcm,
-			SNDRV_PCM_STREAM_CAPTURE);
-		if (ret)
-			goto out;
-	}
-#else
-	printk("HY-DBG 3 : %p %p %p\n", pcm,
-		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_PLAYBACK]):NULL,
-		(pcm != NULL)?&(pcm->streams[SNDRV_PCM_STREAM_CAPTURE]):NULL);
 	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-		printk("HY-DBG: PLAYBACK CASE\n");
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_PLAYBACK);
 		if (ret)
@@ -473,21 +431,16 @@ static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-		printk("HY-DBG: CAPTURE CASE\n");
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_CAPTURE);
 		if (ret)
 			goto out;
 	}
-#endif
 out:
 	return ret;
 }
 
 struct snd_soc_platform_driver omap_soc_platform = {
-#if 0
-	.name		= "omap-pcm-audio",
-#endif
 	.ops 		= &omap_pcm_ops,
 	.pcm_new	= omap_pcm_new,
 	.pcm_free	= omap_pcm_free_dma_buffers,

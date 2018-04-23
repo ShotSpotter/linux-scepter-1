@@ -1010,44 +1010,18 @@ int omap_mcbsp_init(struct platform_device *pdev)
 			mcbsp->irq = 0;
 		}
 	}
-#if 0
-	if (!pdev->dev.of_node) {
-#endif
-		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
-		if (!res) {
-			dev_err(&pdev->dev, "invalid tx DMA channel\n");
-			return -ENODEV;
-		}
-		mcbsp->dma_req[0] = res->start;
-#if 0
-		/* HY-DBG XXX */
-		mcbsp->dma_data[0].filter_data = &mcbsp->dma_req[0];
-#endif
-
-		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
-		if (!res) {
-			dev_err(&pdev->dev, "invalid rx DMA channel\n");
-			return -ENODEV;
-		}
-#if 0
-		/* HY-DBG XXX */
-		mcbsp->dma_req[1] = res->start;
-		mcbsp->dma_data[1].filter_data = &mcbsp->dma_req[1];
-#endif
-#if 0
-	} else {
-		mcbsp->dma_data[0].filter_data = "tx";
-		mcbsp->dma_data[1].filter_data = "rx";
+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+	if (!res) {
+		dev_err(&pdev->dev, "invalid tx DMA channel\n");
+		return -ENODEV;
 	}
-#endif
-#if 0
-	/* HY-DBG XXX */
-	mcbsp->dma_data[0].addr = omap_mcbsp_dma_reg_params(mcbsp, 0);
-	mcbsp->dma_data[0].maxburst = 4;
+	mcbsp->dma_req[0] = res->start;
 
-	mcbsp->dma_data[1].addr = omap_mcbsp_dma_reg_params(mcbsp, 1);
-	mcbsp->dma_data[1].maxburst = 4;
-#endif
+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+	if (!res) {
+		dev_err(&pdev->dev, "invalid rx DMA channel\n");
+		return -ENODEV;
+	}
 
 	mcbsp->fclk = clk_get(&pdev->dev, "fck");
 	if (IS_ERR(mcbsp->fclk)) {

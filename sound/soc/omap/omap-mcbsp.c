@@ -393,6 +393,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	/* In McBSP master modes, FRAME (i.e. sample rate) is generated
 	 * by _counting_ BCLKs. Calculate frame size in BCLKs */
 	master = mcbsp->fmt & SND_SOC_DAIFMT_MASTER_MASK;
+#if 0
 	if (master ==	SND_SOC_DAIFMT_CBS_CFS) {
 		printk(KERN_ERR "This McBSP (%i) is master\n", mcbsp->id);
 		printk(KERN_ERR "mcbsp->clk_div: %d \n",mcbsp->clk_div);
@@ -410,12 +411,15 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 	} else {
+#endif
 		printk(KERN_ERR "This McBSP is slave\n");
 		framesize = wlen * channels;
 		printk(KERN_ERR "framesize: %d\n", framesize);
 		printk(KERN_ERR "wlen: %d\n", wlen);
 		printk(KERN_ERR "channels: %d\n", channels);	
+#if 0
 	}
+#endif
 
 	/* Set FS period and length in terms of bit clock periods */
 	regs->srgr2	&= ~FPER(0xfff);
@@ -530,6 +534,7 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS:
+#if 0
 		/* McBSP master. Set FS and bit clocks as outputs */
 		regs->pcr0	|= FSXM | FSRM |
 				   CLKXM | CLKRM;
@@ -538,13 +543,16 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 			printk(KERN_ERR "mcbsp %i dai set dai fmt is master (CBS_CFS)\n", mcbsp->id);
 
 		break;
+#endif
 	case SND_SOC_DAIFMT_CBM_CFS:
+#if 0
 		/* McBSP slave. FS clock as output */
 		regs->srgr2	|= FSGM;
 		regs->pcr0	|= FSXM | FSRM;
 			printk(KERN_ERR "mcbsp %i dai set dai fmt mcbsp slave/master (CBM_CFS) \n", mcbsp->id);
 
 		break;
+#endif
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* McBSP slave */
 			printk(KERN_ERR "mcbsp %i dai set dai fmt slave CBM CFM\n", mcbsp->id);

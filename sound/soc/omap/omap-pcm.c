@@ -130,7 +130,7 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
                 dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
                 dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
-                dma_data->dma_req = (substream->stream)?16:17;
+                dma_data->dma_req = (substream->stream)?34:33;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
@@ -193,7 +193,7 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
                 dma_data->dma_req = (substream->stream)?32:31;
         } else if (mcbsp->id == 1) {
                 dma_data->port_addr = 0x49022000+((substream->stream)?0x00:0x08);
-                dma_data->dma_req = (substream->stream)?16:17;
+                dma_data->dma_req = (substream->stream)?34:33;
         } else {
                 printk("HY-DBG: NASTY HACK FAILED!!!\n");
         }
